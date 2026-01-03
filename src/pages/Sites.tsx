@@ -1,28 +1,43 @@
 import { useState } from 'react';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search, Filter, Copy, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SiteCard } from '@/components/dashboard/SiteCard';
 import { AddSiteDialog } from '@/components/sites/AddSiteDialog';
-import { Site } from '@/types';
+import { Site, SitePage, FormField } from '@/types';
 
 interface SitesProps {
   sites: Site[];
-  onAddSite: (site: Omit<Site, 'id' | 'createdAt'>) => void;
+  pages: SitePage[];
+  fields: FormField[];
+  onAddSite: (site: Omit<Site, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onRunSite: (id: string) => void;
   onEditSite: (id: string) => void;
   onDeleteSite: (id: string) => void;
+  onDuplicateSite: (id: string) => void;
 }
 
-export const Sites = ({ sites, onAddSite, onRunSite, onEditSite, onDeleteSite }: SitesProps) => {
+export const Sites = ({ 
+  sites, 
+  pages,
+  fields,
+  onAddSite, 
+  onRunSite, 
+  onEditSite, 
+  onDeleteSite,
+  onDuplicateSite 
+}: SitesProps) => {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredSites = sites.filter(
     site => 
       site.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      site.url.toLowerCase().includes(searchQuery.toLowerCase())
+      site.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const getPagesCount = (siteId: string) => pages.filter(p => p.siteId === siteId).length;
+  const getFieldsCount = (siteId: string) => fields.filter(f => f.siteId === siteId).length;
 
   return (
     <div className="space-y-6">
@@ -59,9 +74,12 @@ export const Sites = ({ sites, onAddSite, onRunSite, onEditSite, onDeleteSite }:
           <SiteCard
             key={site.id}
             site={site}
+            pagesCount={getPagesCount(site.id)}
+            fieldsCount={getFieldsCount(site.id)}
             onRun={() => onRunSite(site.id)}
             onEdit={() => onEditSite(site.id)}
             onDelete={() => onDeleteSite(site.id)}
+            onDuplicate={() => onDuplicateSite(site.id)}
           />
         ))}
       </div>

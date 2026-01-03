@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { width: 300px; padding: 16px; font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; }
+    .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #00d4ff, #0066ff); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
+    h1 { margin: 0; font-size: 16px; }
+    .subtitle { color: #888; font-size: 12px; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; margin-top: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00d4ff, #0066ff); color: #fff; }
+    .btn-secondary { background: #2a2a4a; color: #fff; }
+    .status { padding: 8px 12px; background: #2a2a4a; border-radius: 6px; margin-top: 12px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="logo">
+    <div class="logo-icon">Ex</div>
+    <div>
+      <h1>Excellent Data Filler</h1>
+      <div class="subtitle">v4.0</div>
+    </div>
+  </div>
+  <div class="status">Status: Ready</div>
+  <button class="btn btn-primary" id="openApp">Open Configuration</button>
+  <button class="btn btn-secondary" id="runFill">Run Auto-Fill</button>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Dashboard } from '@/pages/Dashboard';
@@ -7,7 +8,7 @@ import { Templates } from '@/pages/Templates';
 import { Logs } from '@/pages/Logs';
 import { Scripts } from '@/pages/Scripts';
 import { Settings } from '@/pages/Settings';
-import { useStore } from '@/hooks/useStore';
+import { useAppStore } from '@/hooks/useAppStore';
 import { toast } from 'sonner';
 import { ExcelData } from '@/types';
 
@@ -22,7 +23,8 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const store = useStore();
+  const navigate = useNavigate();
+  const store = useAppStore();
 
   const handleImportExcel = useCallback(() => {
     // Simulate Excel import
@@ -53,7 +55,7 @@ const Index = () => {
         action: 'fill',
         message: `Starting form fill for ${site.name}`,
       });
-      store.updateSite(id, { status: 'active', lastRun: new Date() });
+      store.updateSite(id, { status: 'active' });
       toast.success(`Running automation for ${site.name}`);
       
       setTimeout(() => {
@@ -68,12 +70,24 @@ const Index = () => {
   }, [store]);
 
   const handleEditSite = useCallback((id: string) => {
-    toast.info('Site configuration will open here');
-  }, []);
+    navigate(`/sites/${id}`);
+  }, [navigate]);
 
   const handleDeleteSite = useCallback((id: string) => {
     store.deleteSite(id);
     toast.success('Site deleted');
+  }, [store]);
+
+  const handleDuplicateSite = useCallback((id: string) => {
+    const newSite = store.duplicateSite(id);
+    if (newSite) {
+      toast.success(`Site duplicated as "${newSite.name}"`);
+    }
+  }, [store]);
+
+  const handleAddNewSite = useCallback((site: Omit<typeof store.sites[0], 'id' | 'createdAt' | 'updatedAt'>) => {
+    store.addSite(site);
+    toast.success('Site added successfully!');
   }, [store]);
 
   const renderContent = () => {
@@ -82,6 +96,8 @@ const Index = () => {
         return (
           <Dashboard
             sites={store.sites}
+            pages={store.pages}
+            fields={store.fields}
             logs={store.logs}
             excelData={store.excelData}
             currentRow={store.currentRow}
@@ -98,10 +114,13 @@ const Index = () => {
         return (
           <Sites
             sites={store.sites}
-            onAddSite={store.addSite}
+            pages={store.pages}
+            fields={store.fields}
+            onAddSite={handleAddNewSite}
             onRunSite={handleRunSite}
             onEditSite={handleEditSite}
             onDeleteSite={handleDeleteSite}
+            onDuplicateSite={handleDuplicateSite}
           />
         );
       case 'templates':
