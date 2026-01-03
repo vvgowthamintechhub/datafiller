@@ -4,10 +4,12 @@ import { SiteCard } from '@/components/dashboard/SiteCard';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { ExcelPreview } from '@/components/dashboard/ExcelPreview';
 import { Button } from '@/components/ui/button';
-import { Site, LogEntry, ExcelData } from '@/types';
+import { Site, SitePage, FormField, LogEntry, ExcelData } from '@/types';
 
 interface DashboardProps {
   sites: Site[];
+  pages: SitePage[];
+  fields: FormField[];
   logs: LogEntry[];
   excelData: ExcelData | null;
   currentRow: number;
@@ -22,6 +24,8 @@ interface DashboardProps {
 
 export const Dashboard = ({
   sites,
+  pages,
+  fields,
   logs,
   excelData,
   currentRow,
@@ -34,9 +38,12 @@ export const Dashboard = ({
   onDeleteSite,
 }: DashboardProps) => {
   const activeSites = sites.filter(s => s.status === 'active').length;
-  const totalFields = sites.reduce((sum, s) => sum + s.fieldsCount, 0);
+  const totalFields = fields.length;
   const successLogs = logs.filter(l => l.action === 'success').length;
   const errorLogs = logs.filter(l => l.action === 'error').length;
+
+  const getPagesCount = (siteId: string) => pages.filter(p => p.siteId === siteId).length;
+  const getFieldsCount = (siteId: string) => fields.filter(f => f.siteId === siteId).length;
 
   return (
     <div className="space-y-6">
@@ -91,6 +98,8 @@ export const Dashboard = ({
               <SiteCard
                 key={site.id}
                 site={site}
+                pagesCount={getPagesCount(site.id)}
+                fieldsCount={getFieldsCount(site.id)}
                 onRun={() => onRunSite(site.id)}
                 onEdit={() => onEditSite(site.id)}
                 onDelete={() => onDeleteSite(site.id)}

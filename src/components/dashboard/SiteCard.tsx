@@ -1,21 +1,33 @@
-import { Globe, Play, Settings, Trash2, ExternalLink } from 'lucide-react';
-import { Site } from '@/types';
+import { Globe, Play, Settings, Trash2, ExternalLink, Copy } from 'lucide-react';
+import { Site, SitePage } from '@/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 
 interface SiteCardProps {
   site: Site;
+  pagesCount?: number;
+  fieldsCount?: number;
+  lastRun?: Date | null;
   onRun?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onDuplicate?: () => void;
 }
 
-export const SiteCard = ({ site, onRun, onEdit, onDelete }: SiteCardProps) => {
+export const SiteCard = ({ 
+  site, 
+  pagesCount = 0,
+  fieldsCount = 0, 
+  lastRun,
+  onRun, 
+  onEdit, 
+  onDelete,
+  onDuplicate 
+}: SiteCardProps) => {
   const statusColors = {
     active: 'bg-success',
     inactive: 'bg-muted-foreground',
-    error: 'bg-destructive',
   };
 
   return (
@@ -29,15 +41,11 @@ export const SiteCard = ({ site, onRun, onEdit, onDelete }: SiteCardProps) => {
             <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
               {site.name}
             </h3>
-            <a 
-              href={site.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 mt-0.5"
-            >
-              {site.url.slice(0, 40)}...
-              <ExternalLink className="w-3 h-3" />
-            </a>
+            {site.description && (
+              <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">
+                {site.description}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -48,11 +56,14 @@ export const SiteCard = ({ site, onRun, onEdit, onDelete }: SiteCardProps) => {
 
       <div className="mt-4 flex items-center gap-6 text-sm text-muted-foreground">
         <div>
-          <span className="font-medium text-foreground">{site.fieldsCount}</span> fields
+          <span className="font-medium text-foreground">{pagesCount}</span> pages
         </div>
         <div>
-          Last run: {site.lastRun 
-            ? formatDistanceToNow(site.lastRun, { addSuffix: true }) 
+          <span className="font-medium text-foreground">{fieldsCount}</span> fields
+        </div>
+        <div>
+          Last run: {lastRun 
+            ? formatDistanceToNow(lastRun, { addSuffix: true }) 
             : 'Never'}
         </div>
       </div>
@@ -72,14 +83,26 @@ export const SiteCard = ({ site, onRun, onEdit, onDelete }: SiteCardProps) => {
             Configure
           </Button>
         </div>
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          onClick={onDelete}
-          className="text-muted-foreground hover:text-destructive"
-        >
-          <Trash2 className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {onDuplicate && (
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={onDuplicate}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Copy className="w-4 h-4" />
+            </Button>
+          )}
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={onDelete}
+            className="text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );
