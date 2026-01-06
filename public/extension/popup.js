@@ -41,15 +41,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateStatus(enabled);
     runFillBtn.disabled = !enabled || !matchedSite;
     
-    // Notify content script
-    try {
-      chrome.tabs.sendMessage(tab.id, { 
-        action: 'toggleExtension', 
-        enabled: enabled 
-      });
-    } catch (e) {
-      console.log('Could not send message to content script');
-    }
+    // Notify content script (may not exist on all pages)
+    chrome.tabs.sendMessage(tab.id, { 
+      action: 'toggleExtension', 
+      enabled: enabled 
+    }).catch(() => {
+      // Content script not loaded on this page - that's OK
+    });
   });
   
   function updateStatus(enabled) {
@@ -70,11 +68,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Run fill button
   runFillBtn.addEventListener('click', async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    try {
-      chrome.tabs.sendMessage(tab.id, { action: 'runFill' });
-      window.close();
-    } catch (e) {
-      console.log('Could not send fill message');
-    }
+    chrome.tabs.sendMessage(tab.id, { action: 'runFill' })
+      .then(() => window.close())
+      .catch(() => {
+        siteInfo.textContent = 'Content script not loaded. Refresh the page.';
+        siteInfo.classList.remove('matched');
+      });
   });
 });
