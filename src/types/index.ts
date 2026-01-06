@@ -17,6 +17,9 @@ export interface SitePage {
   index: number;
   active: boolean;
   fieldsCount: number;
+  description?: string;
+  delayBefore?: number;
+  delayAfter?: number;
 }
 
 // Field types
@@ -68,10 +71,48 @@ export interface FormField {
   runJs: boolean;
   jsCode: string | null;
   waitForElement: boolean;
+  waitForVisible?: boolean;
   executeOnMultiple: boolean;
   index: number;
   onSuccess: FieldAction[];
   onError: FieldAction[];
+  // Advanced options
+  typeAsTyping?: boolean;
+  removeAspxBehavior?: boolean;
+  clearBeforeFill?: boolean;
+  defaultValue?: string;
+  takeFromColumn?: string;
+  replaceWithCustom?: boolean;
+  customReplaceValue?: string;
+  pasteCopiedValue?: boolean;
+  childSelector?: string;
+  triggerJsEvent?: boolean;
+  jsEvents?: string[];
+  triggerMouseEvent?: boolean;
+  fillAfterThis?: string;
+  skipIfConditionTrue?: boolean;
+  skipCondition?: string;
+  waitForResponseChange?: boolean;
+  waitForRequestMonitor?: boolean;
+  matchThenFill?: boolean;
+  matchValue?: string;
+  skipIfFieldMatches?: boolean;
+  skipMatchValue?: string;
+  isRequired?: boolean;
+  successResponseAction?: string;
+  errorResponseAction?: string;
+  skipResponseAction?: string;
+  stopOnError?: boolean;
+  stopOnSuccess?: boolean;
+  searchAndExecute?: boolean;
+  executeAsRowType?: boolean;
+  loopMultipleElements?: boolean;
+  skipStatusColor?: boolean;
+  ignoreInExcel?: boolean;
+  delayBefore?: number;
+  delayAfter?: number;
+  position?: number;
+  waitTimeout?: number;
 }
 
 // Segment for grouping actions
