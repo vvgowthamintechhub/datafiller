@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Excellent Data Filler",
-  "version": "4.0.0",
+  "name": "QAFormFiller",
+  "version": "1.0.0",
   "description": "Automate form filling with Excel data",
   "permissions": ["activeTab", "storage", "scripting"],
   "host_permissions": ["<all_urls>"],

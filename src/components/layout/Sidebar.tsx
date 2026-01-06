@@ -39,13 +39,13 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center glow-primary">
-            <Zap className="w-6 h-6 text-primary-foreground" />
+          <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center shadow-md">
+            <span className="text-sm font-bold text-primary-foreground">Qa</span>
           </div>
           {!collapsed && (
             <div className="animate-fade-in">
-              <h1 className="font-semibold text-foreground">Data Filler</h1>
-              <p className="text-xs text-muted-foreground">v4.0 Pro</p>
+              <h1 className="font-semibold text-foreground">QAFormFiller</h1>
+              <p className="text-xs text-muted-foreground">v1.0</p>
             </div>
           )}
         </div>
