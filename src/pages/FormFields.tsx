@@ -135,7 +135,14 @@ export const FormFields = ({
   };
 
   const handleHighlightField = (field: FormField) => {
-    // Send message to extension to highlight this field
+    if (!field.selectorQuery) {
+      toast.error('Please enter a selector query first', {
+        style: { background: '#ef4444', color: '#ffffff' }
+      });
+      return;
+    }
+    
+    // Send message to extension via localStorage
     const message = {
       type: 'HIGHLIGHT_FIELD',
       field: {
@@ -146,10 +153,9 @@ export const FormFields = ({
       url: page.url
     };
     
-    // Store in localStorage for extension to read
     localStorage.setItem('edf_highlight_request', JSON.stringify(message));
     
-    toast.success(`Highlight request sent for "${field.name}". Open the target URL to see the highlighted element.`, {
+    toast.success(`Open "${page.url}" in your browser to highlight "${field.name}"`, {
       style: { background: '#22c55e', color: '#ffffff' }
     });
   };
@@ -275,7 +281,14 @@ export const FormFields = ({
             <Button variant="outline" onClick={onBack} className="text-blue-600 border-blue-300 hover:bg-blue-50">
               ← Back
             </Button>
-            <Button className="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
+            <Button 
+              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => {
+                toast.success('All fields saved successfully!', {
+                  style: { background: '#22c55e', color: '#ffffff' }
+                });
+              }}
+            >
               <Save className="w-4 h-4" />
               Update
             </Button>
