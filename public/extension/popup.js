@@ -86,13 +86,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
   
-  // Open app button - Navigate to site config if matched, otherwise to sites list
+  // Open app button - Always navigate to dashboard (home) with all sites
   openAppBtn.addEventListener('click', () => {
-    if (matchedSiteId) {
-      chrome.tabs.create({ url: `${APP_URL}/sites/${matchedSiteId}` });
-    } else {
-      chrome.tabs.create({ url: `${APP_URL}/sites` });
-    }
+    chrome.tabs.create({ url: `${APP_URL}/` });
   });
   
   // Run fill button
