@@ -3,15 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <style>
-    body { width: 300px; padding: 16px; font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; }
+    body { width: 320px; padding: 16px; font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; margin: 0; }
     .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-    .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #00d4ff, #0066ff); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
+    .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #00d4ff, #0066ff); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; color: #fff; }
     h1 { margin: 0; font-size: 16px; }
     .subtitle { color: #888; font-size: 12px; }
-    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; margin-top: 12px; }
+    .toggle-container { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #2a2a4a; border-radius: 8px; margin-bottom: 12px; }
+    .toggle-label { font-size: 14px; font-weight: 500; }
+    .toggle { position: relative; width: 50px; height: 26px; cursor: pointer; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #dc3545; border-radius: 26px; transition: 0.3s; }
+    .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: 0.3s; }
+    input:checked + .slider { background-color: #0066ff; }
+    input:checked + .slider:before { transform: translateX(24px); }
+    .status { padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+    .status.on { background: rgba(0, 102, 255, 0.2); color: #00d4ff; }
+    .status.off { background: rgba(220, 53, 69, 0.2); color: #dc3545; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .status.on .status-dot { background: #00d4ff; }
+    .status.off .status-dot { background: #dc3545; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; margin-top: 8px; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.9; }
     .btn-primary { background: linear-gradient(135deg, #00d4ff, #0066ff); color: #fff; }
     .btn-secondary { background: #2a2a4a; color: #fff; }
-    .status { padding: 8px 12px; background: #2a2a4a; border-radius: 6px; margin-top: 12px; font-size: 12px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .site-info { padding: 8px 12px; background: #2a2a4a; border-radius: 6px; margin-bottom: 12px; font-size: 11px; color: #888; }
+    .site-info.matched { background: rgba(40, 167, 69, 0.2); color: #28a745; }
   </style>
 </head>
 <body>
@@ -22,9 +39,25 @@
       <div class="subtitle">v4.0</div>
     </div>
   </div>
-  <div class="status">Status: Ready</div>
+  
+  <div class="toggle-container">
+    <span class="toggle-label">Extension</span>
+    <label class="toggle">
+      <input type="checkbox" id="extensionToggle">
+      <span class="slider"></span>
+    </label>
+  </div>
+  
+  <div class="status off" id="statusBar">
+    <span class="status-dot"></span>
+    <span id="statusText">Extension is OFF</span>
+  </div>
+  
+  <div class="site-info" id="siteInfo">Current site: Not configured</div>
+  
   <button class="btn btn-primary" id="openApp">Open Configuration</button>
-  <button class="btn btn-secondary" id="runFill">Run Auto-Fill</button>
+  <button class="btn btn-secondary" id="runFill" disabled>Run Auto-Fill</button>
+  
   <script src="popup.js"></script>
 </body>
 </html>
