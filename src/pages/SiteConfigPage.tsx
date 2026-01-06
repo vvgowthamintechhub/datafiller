@@ -18,11 +18,15 @@ const SiteConfigPage = () => {
     <SiteConfig
       site={site}
       pages={pages}
+      excelData={store.excelData}
       onUpdateSite={store.updateSite}
       onAddPage={store.addPage}
       onUpdatePage={store.updatePage}
       onDeletePage={store.deletePage}
+      onDuplicatePage={store.duplicatePage}
       onViewFields={handleViewFields}
+      onImportExcel={store.importExcelData}
+      onClearExcel={store.clearExcelData}
     />
   );
 };

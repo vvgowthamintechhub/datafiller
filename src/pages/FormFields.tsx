@@ -133,9 +133,9 @@ export const FormFields = ({
       return;
     }
     copiedFields.forEach((field, idx) => {
+      const { id, ...fieldWithoutId } = field;
       onAddField({
-        ...field,
-        id: undefined as any,
+        ...fieldWithoutId,
         pageId: page.id,
         siteId: page.siteId,
         index: fields.length + idx,
