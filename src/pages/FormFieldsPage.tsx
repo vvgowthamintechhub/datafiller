@@ -23,6 +23,7 @@ const FormFieldsPage = () => {
       onAddField={store.addField}
       onUpdateField={store.updateField}
       onDeleteField={store.deleteField}
+      onReorderFields={store.reorderFields}
       onBack={handleBack}
     />
   );
