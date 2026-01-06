@@ -296,6 +296,33 @@ export const useAppStore = () => {
     setFields(prev => prev.filter(f => f.pageId !== id));
   }, []);
 
+  const duplicatePage = useCallback((id: string) => {
+    const page = pages.find(p => p.id === id);
+    if (!page) return null;
+
+    const newPageId = crypto.randomUUID();
+    const newPage: SitePage = {
+      ...page,
+      id: newPageId,
+      index: pages.filter(p => p.siteId === page.siteId).length,
+      fieldsCount: 0,
+    };
+
+    // Copy fields for this page
+    const pageFields = fields.filter(f => f.pageId === id);
+    const newFields = pageFields.map((f, idx) => ({
+      ...f,
+      id: crypto.randomUUID(),
+      pageId: newPageId,
+      index: idx,
+    }));
+
+    setPages(prev => [...prev, { ...newPage, fieldsCount: newFields.length }]);
+    setFields(prev => [...prev, ...newFields]);
+
+    return newPage;
+  }, [pages, fields]);
+
   const getPagesBySite = useCallback((siteId: string) => {
     return pages.filter(p => p.siteId === siteId).sort((a, b) => a.index - b.index);
   }, [pages]);
@@ -440,6 +467,7 @@ export const useAppStore = () => {
     addPage,
     updatePage,
     deletePage,
+    duplicatePage,
     getPagesBySite,
 
     // Field operations
