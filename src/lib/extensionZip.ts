@@ -2,8 +2,8 @@ import JSZip from 'jszip';
 
 const manifestJson = `{
   "manifest_version": 3,
-  "name": "Excellent Data Filler",
-  "version": "4.0.0",
+  "name": "QAFormFiller",
+  "version": "1.0.0",
   "description": "Automate form filling with Excel data",
   "permissions": ["activeTab", "storage", "scripting"],
   "host_permissions": ["<all_urls>"],
@@ -35,40 +35,40 @@ const popupHtml = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <style>
-    body { width: 320px; padding: 16px; font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; margin: 0; }
+    body { width: 320px; padding: 16px; font-family: system-ui, sans-serif; background: #ffffff; color: #1a1a2e; margin: 0; }
     .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-    .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #00d4ff, #0066ff); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; color: #fff; }
-    h1 { margin: 0; font-size: 16px; }
-    .subtitle { color: #888; font-size: 12px; }
-    .toggle-container { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #2a2a4a; border-radius: 8px; margin-bottom: 12px; }
-    .toggle-label { font-size: 14px; font-weight: 500; }
+    .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #2563eb, #1d4ed8); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; color: #fff; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3); }
+    h1 { margin: 0; font-size: 16px; color: #1f2937; }
+    .subtitle { color: #6b7280; font-size: 12px; }
+    .toggle-container { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #f3f4f6; border-radius: 8px; margin-bottom: 12px; border: 1px solid #e5e7eb; }
+    .toggle-label { font-size: 14px; font-weight: 500; color: #374151; }
     .toggle { position: relative; width: 50px; height: 26px; cursor: pointer; }
     .toggle input { opacity: 0; width: 0; height: 0; }
     .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #dc3545; border-radius: 26px; transition: 0.3s; }
     .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: 0.3s; }
-    input:checked + .slider { background-color: #0066ff; }
+    input:checked + .slider { background-color: #2563eb; }
     input:checked + .slider:before { transform: translateX(24px); }
     .status { padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; display: flex; align-items: center; gap: 8px; }
-    .status.on { background: rgba(0, 102, 255, 0.2); color: #00d4ff; }
-    .status.off { background: rgba(220, 53, 69, 0.2); color: #dc3545; }
+    .status.on { background: rgba(37, 99, 235, 0.1); color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.2); }
+    .status.off { background: rgba(220, 53, 69, 0.1); color: #dc3545; border: 1px solid rgba(220, 53, 69, 0.2); }
     .status-dot { width: 8px; height: 8px; border-radius: 50%; }
-    .status.on .status-dot { background: #00d4ff; }
+    .status.on .status-dot { background: #2563eb; }
     .status.off .status-dot { background: #dc3545; }
-    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; margin-top: 8px; transition: opacity 0.2s; }
-    .btn:hover { opacity: 0.9; }
-    .btn-primary { background: linear-gradient(135deg, #00d4ff, #0066ff); color: #fff; }
-    .btn-secondary { background: #2a2a4a; color: #fff; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .site-info { padding: 8px 12px; background: #2a2a4a; border-radius: 6px; margin-bottom: 12px; font-size: 11px; color: #888; }
-    .site-info.matched { background: rgba(40, 167, 69, 0.2); color: #28a745; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; margin-top: 8px; transition: all 0.2s; }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3); }
+    .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .site-info { padding: 8px 12px; background: #f9fafb; border-radius: 6px; margin-bottom: 12px; font-size: 11px; color: #6b7280; border: 1px solid #e5e7eb; }
+    .site-info.matched { background: rgba(34, 197, 94, 0.1); color: #16a34a; border: 1px solid rgba(34, 197, 94, 0.2); }
   </style>
 </head>
 <body>
   <div class="logo">
-    <div class="logo-icon">Ex</div>
+    <div class="logo-icon">Qa</div>
     <div>
-      <h1>Excellent Data Filler</h1>
-      <div class="subtitle">v4.0</div>
+      <h1>QAFormFiller</h1>
+      <div class="subtitle">v1.0</div>
     </div>
   </div>
   
@@ -133,10 +133,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateStatus(enabled);
     runFillBtn.disabled = !enabled || !matchedSite;
     
-    // Notify content script
+    // Notify content script (may not exist on all pages)
     chrome.tabs.sendMessage(tab.id, { 
       action: 'toggleExtension', 
       enabled: enabled 
+    }).catch(() => {
+      // Content script not loaded on this page - that's OK
     });
   });
   
@@ -158,13 +160,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Run fill button
   runFillBtn.addEventListener('click', async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    chrome.tabs.sendMessage(tab.id, { action: 'runFill' });
-    window.close();
+    chrome.tabs.sendMessage(tab.id, { action: 'runFill' })
+      .then(() => window.close())
+      .catch(() => {
+        siteInfo.textContent = 'Content script not loaded. Refresh the page.';
+        siteInfo.classList.remove('matched');
+      });
   });
 });`;
 
-const backgroundJs = `// Excellent Data Filler - Background Service Worker
-console.log('Excellent Data Filler extension installed');
+const backgroundJs = `// QAFormFiller - Background Service Worker
+console.log('QAFormFiller extension installed');
 
 chrome.runtime.onInstalled.addListener(() => {
   // Initialize extension state
@@ -207,13 +213,13 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     const enabled = changes.extensionEnabled.newValue;
     chrome.action.setBadgeText({ text: enabled ? 'ON' : 'OFF' });
     chrome.action.setBadgeBackgroundColor({ 
-      color: enabled ? '#0066ff' : '#dc3545' 
+      color: enabled ? '#2563eb' : '#dc3545' 
     });
   }
 });`;
 
-const contentJs = `// Excellent Data Filler - Content Script
-console.log('Excellent Data Filler content script loaded');
+const contentJs = `// QAFormFiller - Content Script
+console.log('QAFormFiller content script loaded');
 
 let isEnabled = false;
 let currentConfig = null;
@@ -272,7 +278,7 @@ function highlightConfiguredFields() {
     
     const element = findElement(field);
     if (element) {
-      element.style.outline = '2px dashed #0066ff';
+      element.style.outline = '2px dashed #2563eb';
       element.title = 'Auto-fill: ' + field.name;
     }
   });
@@ -456,7 +462,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Initialize on load
 init();`;
 
-const readmeContent = `# Excellent Data Filler - Chrome Extension
+const readmeContent = `# QAFormFiller - Chrome Extension
 
 ## Installation
 
@@ -482,17 +488,27 @@ The web app (running at http://localhost:3000) allows you to:
 - Upload Excel data for form filling
 - Map Excel columns to form fields
 
+## Extension States
+
+- **ON (Blue toggle)**: Extension is active and will auto-detect configured sites
+- **OFF (Red toggle)**: Extension is disabled and won't interact with any site
+
 ## Files
 
 - \`manifest.json\` - Extension configuration
-- \`popup.html/js\` - Extension popup UI
+- \`popup.html/js\` - Extension popup UI with ON/OFF toggle
 - \`background.js\` - Background service worker
 - \`content.js\` - Content script for form interaction
 
 ## Icons
 
-Create icon files (icon16.png, icon48.png, icon128.png) in the icons/ folder.
-You can use any icon or create one with "Ex" text.
+The icons/ folder contains the extension icons (icon16.png, icon48.png, icon128.png).
+
+## Changing the App URL
+
+By default, the extension opens \`http://localhost:3000\`. To change this:
+1. Edit \`popup.js\`
+2. Change the \`APP_URL\` constant at the top of the file
 `;
 
 export async function generateExtensionZip(): Promise<Blob> {
@@ -525,16 +541,16 @@ export async function generateExtensionZip(): Promise<Blob> {
 
 // Generate a simple icon as base64 PNG (using SVG converted to base64)
 function generateIconSvg(size: number): string {
-  // This creates a simple gradient icon with "Ex" text
+  // This creates a simple gradient icon with "Qa" text
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     <defs>
       <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#00d4ff"/>
-        <stop offset="100%" style="stop-color:#0066ff"/>
+        <stop offset="0%" style="stop-color:#2563eb"/>
+        <stop offset="100%" style="stop-color:#1d4ed8"/>
       </linearGradient>
     </defs>
     <rect width="${size}" height="${size}" rx="${size * 0.2}" fill="url(#grad)"/>
-    <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-weight="bold" font-size="${size * 0.4}">Ex</text>
+    <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-weight="bold" font-size="${size * 0.35}">Qa</text>
   </svg>`;
   
   // Return as base64 (browsers can use SVG as icon, but we'll keep PNG extension for compatibility)
@@ -546,7 +562,7 @@ export function downloadExtension() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'excellent-data-filler-extension.zip';
+    a.download = 'qaformfiller-extension.zip';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

@@ -7,6 +7,7 @@ import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import SiteConfigPage from "./pages/SiteConfigPage";
 import FormFieldsPage from "./pages/FormFieldsPage";
+import Documentation from "./pages/Documentation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/app" element={<Index />} />
+          <Route path="/docs" element={<Documentation />} />
           <Route path="/sites/:siteId" element={<SiteConfigPage />} />
           <Route path="/sites/:siteId/pages/:pageId" element={<FormFieldsPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
