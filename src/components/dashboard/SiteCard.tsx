@@ -1,8 +1,16 @@
-import { Globe, Play, Settings, Trash2, ExternalLink, Copy } from 'lucide-react';
-import { Site, SitePage } from '@/types';
+import { Globe, Play, Settings, Trash2, Copy, Archive, Pencil, MoreVertical } from 'lucide-react';
+import { Site } from '@/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
 
 interface SiteCardProps {
   site: Site;
@@ -13,6 +21,7 @@ interface SiteCardProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onDuplicate?: () => void;
+  onArchive?: () => void;
 }
 
 export const SiteCard = ({ 
@@ -23,82 +32,89 @@ export const SiteCard = ({
   onRun, 
   onEdit, 
   onDelete,
-  onDuplicate 
+  onDuplicate,
+  onArchive
 }: SiteCardProps) => {
   const statusColors = {
-    active: 'bg-success',
-    inactive: 'bg-muted-foreground',
+    active: 'bg-green-500',
+    inactive: 'bg-gray-400',
+  };
+
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(site.id);
+    toast.success('Site ID copied to clipboard');
   };
 
   return (
-    <div className="glass rounded-xl p-5 animate-slide-up hover:border-primary/30 transition-all duration-300 group">
+    <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-md transition-all duration-300">
       <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <div className="p-3 rounded-lg bg-muted">
-            <Globe className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-              {site.name}
-            </h3>
-            {site.description && (
-              <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">
-                {site.description}
-              </p>
-            )}
-          </div>
+        <div>
+          <h3 className="font-semibold text-gray-900">{site.name}</h3>
+          {site.description && (
+            <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">{site.description}</p>
+          )}
+          <p className="text-xs text-blue-500 mt-2">
+            {format(new Date(site.createdAt), 'dd-MM-yyyy hh:mm a')}
+          </p>
         </div>
         <div className="flex items-center gap-1.5">
           <span className={cn("w-2 h-2 rounded-full", statusColors[site.status])} />
-          <span className="text-xs text-muted-foreground capitalize">{site.status}</span>
+          <span className="text-xs text-gray-500 capitalize">{site.status}</span>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-6 text-sm text-muted-foreground">
-        <div>
-          <span className="font-medium text-foreground">{pagesCount}</span> pages
-        </div>
-        <div>
-          <span className="font-medium text-foreground">{fieldsCount}</span> fields
-        </div>
-        <div>
-          Last run: {lastRun 
-            ? formatDistanceToNow(lastRun, { addSuffix: true }) 
-            : 'Never'}
-        </div>
-      </div>
-
-      <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button 
-            size="sm" 
-            onClick={onRun}
-            className="gap-1.5 gradient-primary text-primary-foreground"
-          >
-            <Play className="w-3.5 h-3.5" />
-            Run
-          </Button>
-          <Button size="sm" variant="outline" onClick={onEdit} className="gap-1.5">
-            <Settings className="w-3.5 h-3.5" />
-            Configure
-          </Button>
+      <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+        <div className="flex items-center gap-4 text-sm text-gray-500">
+          <span><span className="font-medium text-gray-700">{pagesCount}</span> pages</span>
+          <span><span className="font-medium text-gray-700">{fieldsCount}</span> fields</span>
         </div>
         <div className="flex items-center gap-1">
-          {onDuplicate && (
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              onClick={onDuplicate}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <Copy className="w-4 h-4" />
-            </Button>
-          )}
-          <Button 
-            size="sm" 
-            variant="ghost" 
+          {/* Edit - Green */}
+          <Button
+            size="sm"
+            onClick={onEdit}
+            className="h-8 w-8 p-0 bg-green-500 hover:bg-green-600 text-white"
+            title="Edit Site"
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
+          
+          {/* Duplicate - Yellow */}
+          <Button
+            size="sm"
+            onClick={onDuplicate}
+            className="h-8 w-8 p-0 bg-yellow-500 hover:bg-yellow-600 text-white"
+            title="Duplicate Site"
+          >
+            <Copy className="w-4 h-4" />
+          </Button>
+          
+          {/* Copy ID - Blue */}
+          <Button
+            size="sm"
+            onClick={handleCopyId}
+            className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 text-white"
+            title="Copy Site ID"
+          >
+            <Copy className="w-4 h-4" />
+          </Button>
+          
+          {/* Archive - Yellow/Orange */}
+          <Button
+            size="sm"
+            onClick={onArchive}
+            className="h-8 w-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
+            title="Move to Archive"
+          >
+            <Archive className="w-4 h-4" />
+          </Button>
+          
+          {/* Delete - Red */}
+          <Button
+            size="sm"
             onClick={onDelete}
-            className="text-muted-foreground hover:text-destructive"
+            className="h-8 w-8 p-0 bg-red-500 hover:bg-red-600 text-white"
+            title="Delete Site"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
