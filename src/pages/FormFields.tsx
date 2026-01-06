@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Plus, GripVertical, Pencil, Trash2, Copy, Clipboard, FileSpreadsheet, ChevronDown, List, Check } from 'lucide-react';
+import { ArrowLeft, Save, Plus, GripVertical, Pencil, Trash2, Copy, Clipboard, FileSpreadsheet, ChevronDown, List, Check, Search, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -27,6 +27,7 @@ interface FormFieldsProps {
   onAddField: (field: Omit<FormField, 'id'>) => void;
   onUpdateField: (id: string, updates: Partial<FormField>) => void;
   onDeleteField: (id: string) => void;
+  onReorderFields?: (pageId: string, fieldIds: string[]) => void;
   onBack: () => void;
 }
 
@@ -40,6 +41,7 @@ export const FormFields = ({
   onAddField,
   onUpdateField,
   onDeleteField,
+  onReorderFields,
   onBack,
 }: FormFieldsProps) => {
   const navigate = useNavigate();
@@ -47,6 +49,12 @@ export const FormFields = ({
   const [showFieldDialog, setShowFieldDialog] = useState(false);
   const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   if (!page) {
     return (
@@ -58,6 +66,21 @@ export const FormFields = ({
       </div>
     );
   }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = fields.findIndex(f => f.id === active.id);
+      const newIndex = fields.findIndex(f => f.id === over.id);
+      const newOrder = arrayMove(fields, oldIndex, newIndex);
+      if (onReorderFields) {
+        onReorderFields(page.id, newOrder.map(f => f.id));
+      }
+      toast.success('Fields reordered', {
+        style: { background: '#22c55e', color: '#ffffff' }
+      });
+    }
+  };
 
   const handleAddField = () => {
     setEditingField(null);
@@ -72,14 +95,16 @@ export const FormFields = ({
   const handleSaveField = (fieldData: Partial<FormField>) => {
     if (editingField) {
       onUpdateField(editingField.id, fieldData);
-      toast.success('Field updated');
+      toast.success('Field updated successfully', {
+        style: { background: '#22c55e', color: '#ffffff' }
+      });
     } else {
       const newIndex = fields.length;
       onAddField({
         pageId: page.id,
         siteId: page.siteId,
         name: fieldData.name || 'New Field',
-        selectorType: fieldData.selectorType || 'selector',
+        selectorType: fieldData.selectorType || 'xpath',
         selectorQuery: fieldData.selectorQuery || '',
         fieldType: fieldData.fieldType || 'text',
         value: fieldData.value || '',
@@ -94,7 +119,9 @@ export const FormFields = ({
         onError: [],
         ...fieldData,
       });
-      toast.success('Field added');
+      toast.success('Field added successfully', {
+        style: { background: '#22c55e', color: '#ffffff' }
+      });
     }
     setShowFieldDialog(false);
     setEditingField(null);
@@ -102,7 +129,29 @@ export const FormFields = ({
 
   const handleDeleteField = (id: string) => {
     onDeleteField(id);
-    toast.success('Field deleted');
+    toast.success('Field deleted', {
+      style: { background: '#22c55e', color: '#ffffff' }
+    });
+  };
+
+  const handleHighlightField = (field: FormField) => {
+    // Send message to extension to highlight this field
+    const message = {
+      type: 'HIGHLIGHT_FIELD',
+      field: {
+        selectorType: field.selectorType,
+        selectorQuery: field.selectorQuery,
+        name: field.name
+      },
+      url: page.url
+    };
+    
+    // Store in localStorage for extension to read
+    localStorage.setItem('edf_highlight_request', JSON.stringify(message));
+    
+    toast.success(`Highlight request sent for "${field.name}". Open the target URL to see the highlighted element.`, {
+      style: { background: '#22c55e', color: '#ffffff' }
+    });
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -127,12 +176,16 @@ export const FormFields = ({
 
   const handleCopySelected = () => {
     copiedFields = fields.filter(f => selectedFields.has(f.id));
-    toast.success(`${copiedFields.length} fields copied`);
+    toast.success(`${copiedFields.length} fields copied`, {
+      style: { background: '#22c55e', color: '#ffffff' }
+    });
   };
 
   const handlePasteFields = () => {
     if (copiedFields.length === 0) {
-      toast.error('No fields copied');
+      toast.error('No fields copied', {
+        style: { background: '#ef4444', color: '#ffffff' }
+      });
       return;
     }
     copiedFields.forEach((field, idx) => {
@@ -144,19 +197,25 @@ export const FormFields = ({
         index: fields.length + idx,
       });
     });
-    toast.success(`${copiedFields.length} fields pasted`);
+    toast.success(`${copiedFields.length} fields pasted`, {
+      style: { background: '#22c55e', color: '#ffffff' }
+    });
   };
 
   const handleDeleteSelected = () => {
     selectedFields.forEach(id => onDeleteField(id));
     setSelectedFields(new Set());
     setSelectAll(false);
-    toast.success('Selected fields deleted');
+    toast.success('Selected fields deleted', {
+      style: { background: '#22c55e', color: '#ffffff' }
+    });
   };
 
   const handleFetchFromExcel = () => {
     if (excelColumns.length === 0) {
-      toast.error('No Excel data uploaded. Please upload Excel first.');
+      toast.error('No Excel data uploaded. Please upload Excel first.', {
+        style: { background: '#ef4444', color: '#ffffff' }
+      });
       return;
     }
     excelColumns.forEach((col, idx) => {
@@ -164,7 +223,7 @@ export const FormFields = ({
         pageId: page.id,
         siteId: page.siteId,
         name: col,
-        selectorType: 'selector',
+        selectorType: 'xpath',
         selectorQuery: '',
         fieldType: 'text',
         value: `{$${col}$}`,
@@ -179,7 +238,9 @@ export const FormFields = ({
         onError: [],
       });
     });
-    toast.success(`${excelColumns.length} fields created from Excel columns`);
+    toast.success(`${excelColumns.length} fields created from Excel columns`, {
+      style: { background: '#22c55e', color: '#ffffff' }
+    });
   };
 
   const getFieldIcon = (type: FieldType) => {
@@ -307,145 +368,60 @@ export const FormFields = ({
 
         {/* Fields Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50">
-                <TableHead className="w-12">
-                  <Checkbox 
-                    checked={selectAll}
-                    onCheckedChange={handleSelectAll}
-                  />
-                </TableHead>
-                <TableHead className="w-12 text-gray-600">Move</TableHead>
-                <TableHead className="w-24 text-gray-600">Active</TableHead>
-                <TableHead className="w-48 text-gray-600">Field Name</TableHead>
-                <TableHead className="w-32 text-gray-600">Selector Type</TableHead>
-                <TableHead className="text-gray-600">Selector Query</TableHead>
-                <TableHead className="w-24 text-gray-600">Wait (ms)</TableHead>
-                <TableHead className="w-20 text-gray-600">Run JS</TableHead>
-                <TableHead className="w-32 text-gray-600">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {fields.map((field) => (
-                <TableRow key={field.id} className="hover:bg-gray-50">
-                  <TableCell>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="w-12">
                     <Checkbox 
-                      checked={selectedFields.has(field.id)}
-                      onCheckedChange={(checked) => handleSelectField(field.id, checked as boolean)}
+                      checked={selectAll}
+                      onCheckedChange={handleSelectAll}
                     />
-                  </TableCell>
-                  <TableCell>
-                    <GripVertical className="w-4 h-4 text-gray-400 cursor-grab" />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={field.enabled}
-                        onCheckedChange={(checked) => onUpdateField(field.id, { enabled: checked })}
-                      />
-                      <span className="text-gray-400">
-                        {getFieldIcon(field.fieldType)}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <button 
-                      onClick={() => handleEditField(field)}
-                      className="text-blue-600 hover:underline text-left"
-                    >
-                      {field.name}
-                    </button>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={field.selectorType}
-                      onValueChange={(value: SelectorType) => onUpdateField(field.id, { selectorType: value })}
-                    >
-                      <SelectTrigger className="h-8 border-gray-300">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="xpath">XPath</SelectItem>
-                        <SelectItem value="selector">Selector</SelectItem>
-                        <SelectItem value="name">Name</SelectItem>
-                        <SelectItem value="id">ID</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        value={field.selectorQuery}
-                        onChange={(e) => onUpdateField(field.id, { selectorQuery: e.target.value })}
-                        className="font-mono text-sm h-8 border-gray-300"
-                        placeholder="Enter selector..."
-                      />
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="h-8 w-8 p-0"
-                        onClick={() => {
-                          navigator.clipboard.writeText(field.selectorQuery);
-                          toast.success('Selector copied');
-                        }}
-                      >
-                        <Copy className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={field.waitTimeout || ''}
-                      onChange={(e) => onUpdateField(field.id, { waitTimeout: parseInt(e.target.value) || undefined })}
-                      className="h-8 w-20 border-gray-300"
-                      placeholder="0"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={field.runJs}
-                      onCheckedChange={(checked) => onUpdateField(field.id, { runJs: checked })}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleEditField(field)}
-                        className="h-8 w-8 p-0 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
-                        title="Edit Field"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteField(field.id)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Delete Field"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  </TableHead>
+                  <TableHead className="w-12 text-gray-600">Move</TableHead>
+                  <TableHead className="w-24 text-gray-600">Active</TableHead>
+                  <TableHead className="w-48 text-gray-600">Field Name 🔍</TableHead>
+                  <TableHead className="w-32 text-gray-600">Selector Type</TableHead>
+                  <TableHead className="text-gray-600">Selector Query ⓘ</TableHead>
+                  <TableHead className="w-24 text-gray-600">Wait (ms)</TableHead>
+                  <TableHead className="w-20 text-gray-600">Run JS</TableHead>
+                  <TableHead className="w-40 text-gray-600">Actions</TableHead>
                 </TableRow>
-              ))}
-              {fields.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12">
-                    <div className="flex flex-col items-center">
-                      <div className="text-4xl text-gray-300 mb-2">≡ Q</div>
-                      <p className="text-red-500 font-medium text-lg">Not Found</p>
-                      <p className="text-gray-500 mt-1">Field Data Not Available, Please Insert a New Field.</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <SortableContext items={fields.map(f => f.id)} strategy={verticalListSortingStrategy}>
+                <TableBody>
+                  {fields.map((field) => (
+                    <SortableFieldRow
+                      key={field.id}
+                      field={field}
+                      isSelected={selectedFields.has(field.id)}
+                      onSelect={(checked) => handleSelectField(field.id, checked)}
+                      onUpdate={onUpdateField}
+                      onEdit={() => handleEditField(field)}
+                      onDelete={() => handleDeleteField(field.id)}
+                      onHighlight={() => handleHighlightField(field)}
+                      getFieldIcon={getFieldIcon}
+                    />
+                  ))}
+                  {fields.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-12">
+                        <div className="flex flex-col items-center">
+                          <div className="text-4xl text-gray-300 mb-2">≡ Q</div>
+                          <p className="text-red-500 font-medium text-lg">Not Found</p>
+                          <p className="text-gray-500 mt-1">Field Data Not Available, Please Insert a New Field.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </SortableContext>
+            </Table>
+          </DndContext>
         </div>
       </div>
 
@@ -464,6 +440,157 @@ export const FormFields = ({
         </DialogContent>
       </Dialog>
     </div>
+  );
+};
+
+// Sortable Field Row Component
+interface SortableFieldRowProps {
+  field: FormField;
+  isSelected: boolean;
+  onSelect: (checked: boolean) => void;
+  onUpdate: (id: string, updates: Partial<FormField>) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onHighlight: () => void;
+  getFieldIcon: (type: FieldType) => React.ReactNode;
+}
+
+const SortableFieldRow = ({
+  field,
+  isSelected,
+  onSelect,
+  onUpdate,
+  onEdit,
+  onDelete,
+  onHighlight,
+  getFieldIcon,
+}: SortableFieldRowProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: field.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className="hover:bg-gray-50">
+      <TableCell>
+        <Checkbox 
+          checked={isSelected}
+          onCheckedChange={(checked) => onSelect(checked as boolean)}
+        />
+      </TableCell>
+      <TableCell>
+        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1">
+          <GripVertical className="w-4 h-4 text-gray-400" />
+        </button>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={field.enabled}
+            onCheckedChange={(checked) => onUpdate(field.id, { enabled: checked })}
+          />
+          <span className="text-gray-400">
+            {getFieldIcon(field.fieldType)}
+          </span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <button 
+          onClick={onEdit}
+          className="text-blue-600 hover:underline text-left"
+        >
+          {field.name}
+        </button>
+      </TableCell>
+      <TableCell>
+        <Select
+          value={field.selectorType}
+          onValueChange={(value: SelectorType) => onUpdate(field.id, { selectorType: value })}
+        >
+          <SelectTrigger className="h-8 border-gray-300">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="xpath">XPath</SelectItem>
+            <SelectItem value="selector">Selector</SelectItem>
+            <SelectItem value="name">Name</SelectItem>
+            <SelectItem value="id">ID</SelectItem>
+          </SelectContent>
+        </Select>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1">
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="h-8 w-8 p-0 border-amber-400 text-amber-600 hover:bg-amber-50"
+            onClick={onHighlight}
+            title="Highlight element in browser"
+          >
+            <Eye className="w-4 h-4" />
+          </Button>
+          <Input
+            value={field.selectorQuery}
+            onChange={(e) => onUpdate(field.id, { selectorQuery: e.target.value })}
+            className="font-mono text-sm h-8 border-gray-300"
+            placeholder="Enter selector..."
+          />
+        </div>
+      </TableCell>
+      <TableCell>
+        <Input
+          type="number"
+          value={field.waitTimeout || ''}
+          onChange={(e) => onUpdate(field.id, { waitTimeout: parseInt(e.target.value) || undefined })}
+          className="h-8 w-20 border-gray-300"
+          placeholder="0"
+        />
+      </TableCell>
+      <TableCell>
+        <Switch
+          checked={field.runJs}
+          onCheckedChange={(checked) => onUpdate(field.id, { runJs: checked })}
+        />
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 text-white"
+            onClick={onEdit}
+            title="Edit Field"
+          >
+            <List className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            className="h-8 w-8 p-0 bg-yellow-500 hover:bg-yellow-600 text-white"
+            onClick={onEdit}
+            title="Edit Field"
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            className="h-8 w-8 p-0 bg-red-500 hover:bg-red-600 text-white"
+            onClick={onDelete}
+            title="Delete Field"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
   );
 };
 
