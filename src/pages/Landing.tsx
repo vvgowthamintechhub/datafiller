@@ -19,6 +19,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { downloadExtension } from '@/lib/extensionZip';
 
 const Landing = () => {
   return (
@@ -217,10 +218,9 @@ const Landing = () => {
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <a 
-              href="/extension/excellent-data-filler.zip" 
-              download
-              className="glass rounded-xl p-6 hover:border-primary/30 transition-all flex flex-col items-center gap-4 group"
+            <button 
+              onClick={downloadExtension}
+              className="glass rounded-xl p-6 hover:border-primary/30 transition-all flex flex-col items-center gap-4 group cursor-pointer border-0 bg-transparent w-full"
             >
               <Chrome className="w-12 h-12 text-foreground group-hover:text-primary transition-colors" />
               <div>
@@ -231,7 +231,7 @@ const Landing = () => {
                 <Download className="w-4 h-4" />
                 Download
               </Button>
-            </a>
+            </button>
 
             <div className="glass rounded-xl p-6 hover:border-primary/30 transition-all flex flex-col items-center gap-4 group">
               <svg className="w-12 h-12 text-foreground group-hover:text-primary transition-colors" viewBox="0 0 24 24" fill="currentColor">
