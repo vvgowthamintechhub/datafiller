@@ -13,7 +13,7 @@
  */
 
 // ============= STATE =============
-let isEnabled = false;
+let isEnabled = true; // Default to enabled
 let currentConfig = null;
 let isRecording = false;
 let recordedSteps = [];
@@ -681,14 +681,19 @@ async function runFormFill() {
 async function init() {
   try {
     const result = await chrome.runtime.sendMessage({ action: 'getConfig' });
-    isEnabled = result.enabled;
+    // Default to enabled if not explicitly set
+    isEnabled = result.enabled ?? true;
     
     if (isEnabled) {
       Logger.extensionState(true);
       await checkForMatchingSite(result.configs);
+    } else {
+      Logger.extensionState(false);
     }
   } catch (e) {
-    // Extension context might not be ready
+    // Extension context might not be ready, default to enabled
+    isEnabled = true;
+    Logger.extensionState(true);
   }
 }
 
