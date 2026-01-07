@@ -3,20 +3,28 @@ import JSZip from 'jszip';
 const manifestJson = `{
   "manifest_version": 3,
   "name": "QAFormFiller",
-  "version": "1.0.0",
-  "description": "Automate form filling with Excel data",
-  "permissions": ["activeTab", "storage", "scripting"],
+  "version": "2.0.0",
+  "description": "EDF-style browser automation - Form filling with Excel data",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "tabs",
+    "webNavigation",
+    "downloads"
+  ],
   "host_permissions": ["<all_urls>"],
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
-    }
+    },
+    "default_title": "QAFormFiller - Click to open dashboard"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [{
     "matches": ["<all_urls>"],
@@ -30,226 +38,344 @@ const manifestJson = `{
   }
 }`;
 
-const popupHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { width: 320px; padding: 16px; font-family: system-ui, sans-serif; background: #ffffff; color: #1a1a2e; margin: 0; }
-    .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-    .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #2563eb, #1d4ed8); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; color: #fff; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3); }
-    h1 { margin: 0; font-size: 16px; color: #1f2937; }
-    .subtitle { color: #6b7280; font-size: 12px; }
-    .toggle-container { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #f3f4f6; border-radius: 8px; margin-bottom: 12px; border: 1px solid #e5e7eb; }
-    .toggle-label { font-size: 14px; font-weight: 500; color: #374151; }
-    .toggle { position: relative; width: 50px; height: 26px; cursor: pointer; }
-    .toggle input { opacity: 0; width: 0; height: 0; }
-    .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #dc3545; border-radius: 26px; transition: 0.3s; }
-    .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: 0.3s; }
-    input:checked + .slider { background-color: #2563eb; }
-    input:checked + .slider:before { transform: translateX(24px); }
-    .status { padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; display: flex; align-items: center; gap: 8px; }
-    .status.on { background: rgba(37, 99, 235, 0.1); color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.2); }
-    .status.off { background: rgba(220, 53, 69, 0.1); color: #dc3545; border: 1px solid rgba(220, 53, 69, 0.2); }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; }
-    .status.on .status-dot { background: #2563eb; }
-    .status.off .status-dot { background: #dc3545; }
-    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; margin-top: 8px; transition: all 0.2s; }
-    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-    .btn-primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3); }
-    .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-    .site-info { padding: 8px 12px; background: #f9fafb; border-radius: 6px; margin-bottom: 12px; font-size: 11px; color: #6b7280; border: 1px solid #e5e7eb; }
-    .site-info.matched { background: rgba(34, 197, 94, 0.1); color: #16a34a; border: 1px solid rgba(34, 197, 94, 0.2); }
-  </style>
-</head>
-<body>
-  <div class="logo">
-    <div class="logo-icon">Qa</div>
-    <div>
-      <h1>QAFormFiller</h1>
-      <div class="subtitle">v1.0</div>
-    </div>
-  </div>
-  
-  <div class="toggle-container">
-    <span class="toggle-label">Extension</span>
-    <label class="toggle">
-      <input type="checkbox" id="extensionToggle">
-      <span class="slider"></span>
-    </label>
-  </div>
-  
-  <div class="status off" id="statusBar">
-    <span class="status-dot"></span>
-    <span id="statusText">Extension is OFF</span>
-  </div>
-  
-  <div class="site-info" id="siteInfo">Current site: Not configured</div>
-  
-  <button class="btn btn-primary" id="openApp">Open Configuration</button>
-  <button class="btn btn-secondary" id="runFill" disabled>Run Auto-Fill</button>
-  
-  <script src="popup.js"></script>
-</body>
-</html>`;
+const backgroundJs = `/**
+ * QAFormFiller - Background Service Worker (ORCHESTRATOR)
+ * EDF v4 Style Architecture
+ */
 
-const popupJs = `// Configuration URL - change this to your app URL
 const APP_URL = 'http://localhost:3000';
 
-document.addEventListener('DOMContentLoaded', async () => {
-  const toggle = document.getElementById('extensionToggle');
-  const statusBar = document.getElementById('statusBar');
-  const statusText = document.getElementById('statusText');
-  const siteInfo = document.getElementById('siteInfo');
-  const runFillBtn = document.getElementById('runFill');
-  
-  // Load saved state
-  const result = await chrome.storage.local.get(['extensionEnabled', 'siteConfigs']);
-  toggle.checked = result.extensionEnabled || false;
-  updateStatus(toggle.checked);
-  
-  // Check current tab for matching site config
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const configs = result.siteConfigs || [];
-  const matchedSite = configs.find(site => {
-    if (!site.pages) return false;
-    return site.pages.some(page => {
-      const regex = new RegExp(page.url);
-      return regex.test(tab.url);
-    });
+let extensionState = {
+  configured: false,
+  enabled: false,
+  errors: []
+};
+
+chrome.runtime.onInstalled.addListener(async () => {
+  console.log('[EDF] QAFormFiller v2.0 installed');
+  const result = await chrome.storage.local.get(['configured', 'extensionEnabled', 'siteConfigs']);
+  extensionState.configured = result.configured || false;
+  extensionState.enabled = result.extensionEnabled || false;
+  await chrome.storage.local.set({
+    configured: extensionState.configured,
+    extensionEnabled: extensionState.enabled,
+    siteConfigs: result.siteConfigs || [],
+    errors: []
   });
-  
-  if (matchedSite) {
-    siteInfo.textContent = 'Site: ' + matchedSite.name;
-    siteInfo.classList.add('matched');
-    runFillBtn.disabled = !toggle.checked;
+  updateBadge();
+});
+
+// Icon click opens full tab (EDF style - no popup)
+chrome.action.onClicked.addListener(async () => {
+  const existingTabs = await chrome.tabs.query({ url: APP_URL + '/*' });
+  if (existingTabs.length > 0) {
+    await chrome.tabs.update(existingTabs[0].id, { active: true });
+    await chrome.windows.update(existingTabs[0].windowId, { focused: true });
+  } else {
+    await chrome.tabs.create({ url: APP_URL });
   }
-  
-  // Toggle handler
-  toggle.addEventListener('change', async () => {
-    const enabled = toggle.checked;
-    await chrome.storage.local.set({ extensionEnabled: enabled });
-    updateStatus(enabled);
-    runFillBtn.disabled = !enabled || !matchedSite;
-    
-    // Notify content script (may not exist on all pages)
-    chrome.tabs.sendMessage(tab.id, { 
-      action: 'toggleExtension', 
-      enabled: enabled 
-    }).catch(() => {
-      // Content script not loaded on this page - that's OK
-    });
+});
+
+function updateBadge() {
+  chrome.action.setBadgeText({ text: extensionState.enabled ? 'ON' : 'OFF' });
+  chrome.action.setBadgeBackgroundColor({ color: extensionState.enabled ? '#22c55e' : '#dc2626' });
+}
+
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.extensionEnabled) {
+    extensionState.enabled = changes.extensionEnabled.newValue;
+    updateBadge();
+  }
+});
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function sendToContent(tabId, message) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, message);
+  } catch (e) {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+    await delay(500);
+    return await chrome.tabs.sendMessage(tabId, message);
+  }
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  handleMessage(message, sender).then(sendResponse).catch(err => {
+    sendResponse({ success: false, error: err.message });
   });
+  return true;
+});
+
+async function handleMessage(message) {
+  switch (message.action) {
+    case 'getConfig':
+      const config = await chrome.storage.local.get(['siteConfigs', 'extensionEnabled', 'configured']);
+      return { configs: config.siteConfigs || [], enabled: config.extensionEnabled || false, configured: config.configured || false };
+    
+    case 'saveConfig':
+      await chrome.storage.local.set({ siteConfigs: message.configs, configured: true });
+      return { success: true };
+    
+    case 'setEnabled':
+      await chrome.storage.local.set({ extensionEnabled: message.enabled });
+      extensionState.enabled = message.enabled;
+      updateBadge();
+      const tabs = await chrome.tabs.query({});
+      for (const tab of tabs) {
+        try { await chrome.tabs.sendMessage(tab.id, { action: 'toggleExtension', enabled: message.enabled }); } catch (e) {}
+      }
+      return { success: true };
+    
+    case 'getExcelData':
+      const excelResult = await chrome.storage.local.get(['excelData', 'currentRowIndex']);
+      return { data: excelResult.excelData || null, currentRow: excelResult.currentRowIndex || 0 };
+    
+    case 'setExcelData':
+      await chrome.storage.local.set({ excelData: message.data, currentRowIndex: 0 });
+      return { success: true };
+    
+    case 'highlightField':
+      return await highlightFieldInTab(message);
+    
+    case 'getErrors':
+      const errorResult = await chrome.storage.local.get(['errors']);
+      return { errors: errorResult.errors || [] };
+    
+    default:
+      return { success: false, error: 'Unknown action' };
+  }
+}
+
+async function highlightFieldInTab(message) {
+  const { url, field } = message;
+  const allTabs = await chrome.tabs.query({});
+  let targetTab = null;
   
-  function updateStatus(enabled) {
-    if (enabled) {
-      statusBar.className = 'status on';
-      statusText.textContent = 'Extension is ON';
-    } else {
-      statusBar.className = 'status off';
-      statusText.textContent = 'Extension is OFF';
+  for (const tab of allTabs) {
+    if (tab.url && tab.url.includes(url)) {
+      targetTab = tab;
+      break;
     }
   }
   
-  // Open app button
-  document.getElementById('openApp').addEventListener('click', () => {
-    chrome.tabs.create({ url: APP_URL });
-  });
-  
-  // Run fill button
-  runFillBtn.addEventListener('click', async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    chrome.tabs.sendMessage(tab.id, { action: 'runFill' })
-      .then(() => window.close())
-      .catch(() => {
-        siteInfo.textContent = 'Content script not loaded. Refresh the page.';
-        siteInfo.classList.remove('matched');
-      });
-  });
-});`;
-
-const backgroundJs = `// QAFormFiller - Background Service Worker
-console.log('QAFormFiller extension installed');
-
-chrome.runtime.onInstalled.addListener(() => {
-  // Initialize extension state
-  chrome.storage.local.set({ 
-    extensionEnabled: false,
-    siteConfigs: []
-  });
-});
-
-// Listen for messages from content script or popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'getConfig') {
-    chrome.storage.local.get(['siteConfigs', 'extensionEnabled'], (result) => {
-      sendResponse({
-        configs: result.siteConfigs || [],
-        enabled: result.extensionEnabled || false
-      });
-    });
-    return true;
+  if (!targetTab) {
+    return { success: false, error: 'Please open the URL first: ' + url };
   }
   
-  if (message.action === 'saveConfig') {
-    chrome.storage.local.set({ siteConfigs: message.configs }, () => {
-      sendResponse({ success: true });
-    });
-    return true;
-  }
+  await chrome.tabs.update(targetTab.id, { active: true });
+  await chrome.windows.update(targetTab.windowId, { focused: true });
   
-  if (message.action === 'getExcelData') {
-    chrome.storage.local.get(['excelData'], (result) => {
-      sendResponse(result.excelData || null);
+  try {
+    return await sendToContent(targetTab.id, {
+      action: 'highlightElement',
+      selector: field.selectorQuery,
+      selectorType: field.selectorType,
+      fieldName: field.name
     });
-    return true;
+  } catch (error) {
+    return { success: false, error: error.message };
   }
-});
+}
 
-// Badge update based on extension state
-chrome.storage.onChanged.addListener((changes, namespace) => {
-  if (changes.extensionEnabled) {
-    const enabled = changes.extensionEnabled.newValue;
-    chrome.action.setBadgeText({ text: enabled ? 'ON' : 'OFF' });
-    chrome.action.setBadgeBackgroundColor({ 
-      color: enabled ? '#2563eb' : '#dc3545' 
-    });
-  }
-});`;
+console.log('[EDF] Background service worker initialized');
+`;
 
-const contentJs = `// QAFormFiller - Content Script with Enhanced Console Logging
-console.log('%c🚀 QAFormFiller Extension Loaded', 'background: #2563eb; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;');
+const contentJs = `/**
+ * QAFormFiller - Content Script (DOM EXECUTOR)
+ * EDF v4 Style Architecture
+ */
 
 let isEnabled = false;
 let currentConfig = null;
-let currentRowIndex = 0;
 
 const Logger = {
   styles: {
-    success: 'background: #16a34a; color: white; padding: 2px 6px; border-radius: 3px;',
-    error: 'background: #dc2626; color: white; padding: 2px 6px; border-radius: 3px;',
-    info: 'background: #0891b2; color: white; padding: 2px 6px; border-radius: 3px;',
-    field: 'background: #7c3aed; color: white; padding: 2px 6px; border-radius: 3px;',
-    wait: 'background: #6366f1; color: white; padding: 2px 6px; border-radius: 3px;',
+    header: 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 8px 16px; border-radius: 6px; font-weight: bold; font-size: 14px;',
+    success: 'background: #10b981; color: white; padding: 3px 8px; border-radius: 4px; font-weight: 600;',
+    error: 'background: #ef4444; color: white; padding: 3px 8px; border-radius: 4px; font-weight: 600;',
+    info: 'background: #3b82f6; color: white; padding: 3px 8px; border-radius: 4px; font-weight: 600;',
+    field: 'background: #8b5cf6; color: white; padding: 3px 8px; border-radius: 4px; font-weight: 600;',
+    divider: 'color: #6366f1; font-weight: bold;'
   },
-  group(title) { if (!isEnabled) return { end: () => {} }; console.groupCollapsed('%c' + title, this.styles.field); return { end: () => console.groupEnd() }; },
-  success(msg, d='') { if (isEnabled) console.log('%c✓ SUCCESS', this.styles.success, msg, d); },
-  error(msg, d='') { if (isEnabled) console.log('%c✗ ERROR', this.styles.error, msg, d); },
-  info(msg, d='') { if (isEnabled) console.log('%c● INFO', this.styles.info, msg, d); },
+  header(msg) { if (!isEnabled) return; console.log('%c🚀 ' + msg, this.styles.header); },
+  divider() { if (!isEnabled) return; console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', this.styles.divider); },
+  success(msg) { if (!isEnabled) return; console.log('%c✓ SUCCESS', this.styles.success, msg); },
+  error(msg) { if (!isEnabled) return; console.log('%c✗ ERROR', this.styles.error, msg); },
+  info(msg) { if (!isEnabled) return; console.log('%c● INFO', this.styles.info, msg); },
+  field(name, idx, total) { if (!isEnabled) return; console.log('%c▶ FIELD [' + idx + '/' + total + ']', this.styles.field, name); },
+  state(enabled) { console.log('%c' + (enabled ? '✓ QAFormFiller ENABLED' : '⏸ QAFormFiller DISABLED'), enabled ? 'background: #10b981; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold;' : 'background: #6b7280; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold;'); }
 };
+
+function findElement(selector, selectorType) {
+  try {
+    switch (selectorType) {
+      case 'xpath': return document.evaluate(selector, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+      case 'id': return document.getElementById(selector);
+      case 'name': return document.querySelector('[name="' + selector + '"]');
+      default: return document.querySelector(selector);
+    }
+  } catch (e) { return null; }
+}
+
+async function waitForElement(selector, selectorType, timeout) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const el = findElement(selector, selectorType);
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) return el;
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return null;
+}
+
+async function fillField(element, value, fieldType) {
+  element.focus();
+  await new Promise(r => setTimeout(r, 50));
+  
+  if (fieldType === 'checkbox') {
+    const shouldCheck = value === 'true' || value === '1' || value === 'yes';
+    if (element.checked !== shouldCheck) element.click();
+  } else if (fieldType === 'radio' || fieldType === 'button') {
+    element.click();
+  } else if (fieldType === 'select') {
+    element.value = value;
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  } else {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+    if (setter) setter.call(element, value); else element.value = value;
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  element.blur();
+}
+
+function highlightElement(selector, selectorType, fieldName) {
+  document.querySelectorAll('.qaff-highlight, .qaff-label').forEach(el => {
+    if (el.classList.contains('qaff-label')) el.remove();
+    else { el.style.outline = ''; el.classList.remove('qaff-highlight'); }
+  });
+  
+  const element = findElement(selector, selectorType);
+  if (element) {
+    element.style.outline = '3px solid #22c55e';
+    element.style.outlineOffset = '3px';
+    element.classList.add('qaff-highlight');
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    const label = document.createElement('div');
+    label.className = 'qaff-label';
+    label.style.cssText = 'position:fixed;top:10px;right:10px;background:#22c55e;color:white;padding:8px 16px;border-radius:6px;font-size:14px;font-weight:bold;z-index:999999;font-family:system-ui,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+    label.textContent = '✓ Found: ' + (fieldName || 'Field');
+    document.body.appendChild(label);
+    
+    setTimeout(() => {
+      element.style.outline = '';
+      element.classList.remove('qaff-highlight');
+      label.remove();
+    }, 5000);
+    
+    Logger.success('Field highlighted: ' + fieldName);
+    return { success: true, message: 'Element found and highlighted' };
+  } else {
+    Logger.error('Field not found: ' + fieldName);
+    return { success: false, message: 'Element not found on this page' };
+  }
+}
+
+async function runFormFill() {
+  if (!isEnabled) return { success: false, message: 'Extension is disabled' };
+  if (!currentConfig) return { success: false, message: 'No matching site configuration' };
+  
+  const fields = currentConfig.page?.fields || [];
+  Logger.header('STARTING FORM FILL');
+  Logger.divider();
+  
+  let filled = 0, errors = 0;
+  let rowData = {};
+  try {
+    const r = await chrome.runtime.sendMessage({ action: 'getExcelData' });
+    if (r?.data?.rows?.[r.currentRow || 0]) {
+      const row = r.data.rows[r.currentRow || 0];
+      (r.data.headers || []).forEach((h, i) => { rowData[h] = row[i] || ''; });
+    }
+  } catch (e) {}
+  
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i];
+    if (!field.enabled) continue;
+    Logger.field(field.name, i + 1, fields.length);
+    
+    let element = field.waitForElement ? await waitForElement(field.selectorQuery, field.selectorType, field.waitTimeout || 5000) : findElement(field.selectorQuery, field.selectorType);
+    
+    if (!element) { Logger.error('Not found'); errors++; continue; }
+    Logger.success('Found');
+    
+    try {
+      let value = (field.value || '').replace(/\\{\\$([^}]+)\\$\\}/g, (_, k) => rowData[k] || '');
+      if (!value && field.defaultValue) value = field.defaultValue;
+      
+      if (field.fieldType === 'button') {
+        element.click();
+      } else if (field.runJs && field.jsCode) {
+        new Function('element', 'value', 'rowData', field.jsCode)(element, value, rowData);
+      } else {
+        await fillField(element, value, field.fieldType);
+      }
+      Logger.success('Filled');
+      filled++;
+      if (field.delayAfter) await new Promise(r => setTimeout(r, field.delayAfter));
+    } catch (e) { Logger.error(e.message); errors++; }
+  }
+  
+  Logger.divider();
+  return { success: errors === 0, filledCount: filled, errorCount: errors, message: 'Filled ' + filled + ' fields' + (errors > 0 ? ', ' + errors + ' errors' : '') };
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  (async () => {
+    switch (msg.action) {
+      case 'toggleExtension':
+        isEnabled = msg.enabled;
+        Logger.state(isEnabled);
+        if (!isEnabled) { document.querySelectorAll('.qaff-highlight, .qaff-label').forEach(el => el.remove?.() || (el.style.outline = '')); currentConfig = null; }
+        else await init();
+        sendResponse({ success: true });
+        break;
+      case 'highlightElement':
+        sendResponse(highlightElement(msg.selector, msg.selectorType, msg.fieldName));
+        break;
+      case 'runFill':
+        sendResponse(await runFormFill());
+        break;
+      case 'getStatus':
+        sendResponse({ enabled: isEnabled, hasConfig: !!currentConfig, siteName: currentConfig?.site?.name });
+        break;
+      default:
+        sendResponse({ success: false });
+    }
+  })();
+  return true;
+});
 
 async function init() {
   try {
     const result = await chrome.runtime.sendMessage({ action: 'getConfig' });
     isEnabled = result.enabled;
-    if (isEnabled) checkForMatchingSite(result.configs);
+    if (isEnabled) {
+      Logger.state(true);
+      checkForMatchingSite(result.configs);
+    }
   } catch (e) {}
 }
 
 function checkForMatchingSite(configs) {
   if (!isEnabled || !configs) return;
-  const currentUrl = window.location.href;
+  const url = window.location.href;
   for (const site of configs) {
     if (!site.pages || site.status !== 'active') continue;
     for (const page of site.pages) {
@@ -257,145 +383,72 @@ function checkForMatchingSite(configs) {
       let matches = false;
       try {
         switch (page.matchType) {
-          case 'regex': matches = new RegExp(page.url).test(currentUrl); break;
-          case 'exact': matches = currentUrl === page.url; break;
-          default: matches = currentUrl.includes(page.url);
+          case 'regex': matches = new RegExp(page.url).test(url); break;
+          case 'exact': matches = url === page.url; break;
+          default: matches = url.includes(page.url);
         }
-      } catch { matches = currentUrl.includes(page.url); }
+      } catch { matches = url.includes(page.url); }
       if (matches) {
         currentConfig = { site, page };
-        Logger.success('Site Matched: ' + site.name);
-        highlightConfiguredFields();
+        Logger.header('Site Matched: ' + site.name);
+        Logger.info('URL: ' + url);
         return;
       }
     }
   }
 }
 
-function highlightConfiguredFields() {
-  if (!isEnabled || !currentConfig?.page?.fields) return;
-  currentConfig.page.fields.forEach(field => {
-    if (!field.enabled) return;
-    const el = findElement(field);
-    if (el) { el.style.outline = '2px dashed #2563eb'; el.title = 'QAFormFiller: ' + field.name; }
-  });
-}
+init();
+`;
 
-function findElement(field) {
-  try {
-    switch (field.selectorType) {
-      case 'xpath': return document.evaluate(field.selectorQuery, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-      case 'name': return document.querySelector('[name="' + field.selectorQuery + '"]');
-      case 'id': return document.getElementById(field.selectorQuery);
-      default: return document.querySelector(field.selectorQuery);
-    }
-  } catch { return null; }
-}
+const readmeContent = `# QAFormFiller - Chrome Extension v2.0
 
-async function fillForm() {
-  if (!isEnabled) return { success: false, message: 'Extension disabled' };
-  if (!currentConfig) return { success: false, message: 'No config' };
-  const fields = currentConfig.page.fields || [];
-  let filled = 0, errors = [];
-  let rowData = {};
-  try { const r = await chrome.runtime.sendMessage({ action: 'getExcelData' }); rowData = r?.rows?.[currentRowIndex] || {}; } catch {}
-  
-  for (const field of fields) {
-    if (!field.enabled) continue;
-    const group = Logger.group(field.name);
-    const el = findElement(field);
-    if (!el) { Logger.error('Not found'); errors.push(field.name); group.end(); continue; }
-    Logger.success('Found');
-    try {
-      let value = (field.value || '').replace(/\\{\\$([^}]+)\\$\\}/g, (_, c) => rowData[c] || '');
-      if (field.runJs && field.jsCode) { new Function('element','value','rowData',field.jsCode)(el,value,rowData); }
-      else { el.value = value; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }
-      Logger.success('Filled');
-      filled++;
-    } catch (e) { Logger.error(e.message); errors.push(field.name); }
-    group.end();
-  }
-  return { success: errors.length === 0, filledCount: filled, errors, message: 'Filled ' + filled + ' fields' };
-}
+## EDF v4 Style Architecture
 
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.action === 'toggleExtension') {
-    isEnabled = msg.enabled;
-    if (isEnabled) chrome.runtime.sendMessage({ action: 'getConfig' }).then(r => checkForMatchingSite(r.configs));
-    else { document.querySelectorAll('[style*="outline"]').forEach(e => e.style.outline = ''); currentConfig = null; }
-    sendResponse({ success: true });
-  }
-  if (msg.action === 'runFill') { fillForm().then(r => sendResponse(r)); return true; }
-  if (msg.action === 'setRowIndex') { currentRowIndex = msg.index; sendResponse({ success: true }); }
-  return true;
-});
-
-init();`;
-
-const readmeContent = `# QAFormFiller - Chrome Extension
+This extension uses a professional 3-layer architecture:
+- **Background Script (Orchestrator)**: Controls tabs, manages state
+- **Content Script (DOM Executor)**: Only handles DOM operations
+- **Web Dashboard**: Full page configuration (no popups)
 
 ## Installation
 
 1. Open Chrome and go to \`chrome://extensions/\`
-2. Enable "Developer mode" (toggle in top-right corner)
+2. Enable "Developer mode"
 3. Click "Load unpacked"
-4. Select this extracted folder
-5. The extension icon will appear in your toolbar
+4. Select this folder
 
 ## Usage
 
-1. Click the extension icon to open the popup
-2. Toggle the extension ON (blue) or OFF (red)
-3. Click "Open Configuration" to open the web app and configure your sites
-4. Navigate to a configured website
-5. Click "Run Auto-Fill" to fill the form
+1. Click the extension icon to open the Dashboard
+2. Configure your sites and fields
+3. Navigate to a configured website
+4. The extension will auto-detect and highlight configured fields
+5. Use "Run Auto-Fill" from the dashboard
 
-## Configuration
+## Key Features
 
-The web app (running at http://localhost:3000) allows you to:
-- Add and configure sites with URL patterns
-- Set up form fields with selectors
-- Upload Excel data for form filling
-- Map Excel columns to form fields
-
-## Extension States
-
-- **ON (Blue toggle)**: Extension is active and will auto-detect configured sites
-- **OFF (Red toggle)**: Extension is disabled and won't interact with any site
+- **No Popup Mode**: Click icon opens full dashboard tab
+- **JSON Workflow Engine**: Supports complex automation
+- **React/Angular/Vue Compatible**: Proper input event handling
+- **Visual Field Highlighting**: Verify selectors work
+- **Error Dashboard**: Track all automation errors
 
 ## Files
 
-- \`manifest.json\` - Extension configuration
-- \`popup.html/js\` - Extension popup UI with ON/OFF toggle
-- \`background.js\` - Background service worker
-- \`content.js\` - Content script for form interaction
-
-## Icons
-
-The icons/ folder contains the extension icons (icon16.png, icon48.png, icon128.png).
-
-## Changing the App URL
-
-By default, the extension opens \`http://localhost:3000\`. To change this:
-1. Edit \`popup.js\`
-2. Change the \`APP_URL\` constant at the top of the file
+- \`manifest.json\` - Extension configuration (no popup)
+- \`background.js\` - Service worker (orchestrator)
+- \`content.js\` - Content script (DOM executor)
 `;
 
 export async function generateExtensionZip(): Promise<Blob> {
   const zip = new JSZip();
   
-  // Add main files
   zip.file('manifest.json', manifestJson);
-  zip.file('popup.html', popupHtml);
-  zip.file('popup.js', popupJs);
   zip.file('background.js', backgroundJs);
   zip.file('content.js', contentJs);
   zip.file('README.md', readmeContent);
   
-  // Create icons folder with placeholder SVG icons
   const iconsFolder = zip.folder('icons');
-  
-  // Generate simple placeholder icons as data URLs
   const icon16 = generateIconSvg(16);
   const icon48 = generateIconSvg(48);
   const icon128 = generateIconSvg(128);
@@ -404,26 +457,20 @@ export async function generateExtensionZip(): Promise<Blob> {
   iconsFolder?.file('icon48.png', icon48, { base64: true });
   iconsFolder?.file('icon128.png', icon128, { base64: true });
   
-  // Generate the zip file
-  const blob = await zip.generateAsync({ type: 'blob' });
-  return blob;
+  return await zip.generateAsync({ type: 'blob' });
 }
 
-// Generate a simple icon as base64 PNG (using SVG converted to base64)
 function generateIconSvg(size: number): string {
-  // This creates a simple gradient icon with "Qa" text
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     <defs>
       <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#2563eb"/>
-        <stop offset="100%" style="stop-color:#1d4ed8"/>
+        <stop offset="0%" style="stop-color:#667eea"/>
+        <stop offset="100%" style="stop-color:#764ba2"/>
       </linearGradient>
     </defs>
     <rect width="${size}" height="${size}" rx="${size * 0.2}" fill="url(#grad)"/>
     <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-weight="bold" font-size="${size * 0.35}">Qa</text>
   </svg>`;
-  
-  // Return as base64 (browsers can use SVG as icon, but we'll keep PNG extension for compatibility)
   return btoa(svg);
 }
 
@@ -432,7 +479,7 @@ export function downloadExtension() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'qaformfiller-extension.zip';
+    a.download = 'qaformfiller-extension-v2.zip';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
