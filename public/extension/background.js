@@ -11,7 +11,8 @@
  * UI and Content Scripts NEVER control tabs directly.
  */
 
-const APP_URL = 'http://localhost:3000';
+// IMPORTANT: Navigate to /app page, not root
+const APP_URL = 'http://localhost:3000/app';
 
 // ============= STATE MANAGEMENT =============
 let extensionState = {
@@ -31,7 +32,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   const result = await chrome.storage.local.get(['configured', 'extensionEnabled', 'siteConfigs']);
   
   extensionState.configured = result.configured || false;
-  extensionState.enabled = result.extensionEnabled || false;
+  extensionState.enabled = result.extensionEnabled ?? true; // Default to enabled
   
   // Initialize storage
   await chrome.storage.local.set({
@@ -48,18 +49,15 @@ chrome.runtime.onInstalled.addListener(async () => {
 // ============= ICON CLICK HANDLER =============
 // EDF v4 Style: Click opens full tab, NOT popup
 chrome.action.onClicked.addListener(async (tab) => {
-  const result = await chrome.storage.local.get(['configured']);
-  
-  // Always open the dashboard in a new tab
-  // The dashboard handles both settings and site management
-  const existingTabs = await chrome.tabs.query({ url: `${APP_URL}/*` });
+  // Always open the /app dashboard in a new tab
+  const existingTabs = await chrome.tabs.query({ url: 'http://localhost:3000/*' });
   
   if (existingTabs.length > 0) {
-    // Focus existing tab
-    await chrome.tabs.update(existingTabs[0].id, { active: true });
+    // Focus existing tab and navigate to /app
+    await chrome.tabs.update(existingTabs[0].id, { active: true, url: APP_URL });
     await chrome.windows.update(existingTabs[0].windowId, { focused: true });
   } else {
-    // Open new tab
+    // Open new tab with /app
     await chrome.tabs.create({ url: APP_URL });
   }
 });

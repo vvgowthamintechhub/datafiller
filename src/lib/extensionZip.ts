@@ -43,11 +43,12 @@ const backgroundJs = `/**
  * EDF v4 Style Architecture
  */
 
-const APP_URL = 'http://localhost:3000';
+// IMPORTANT: Navigate to /app page, not root
+const APP_URL = 'http://localhost:3000/app';
 
 let extensionState = {
   configured: false,
-  enabled: false,
+  enabled: true, // Default to enabled
   errors: []
 };
 
@@ -55,7 +56,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   console.log('[EDF] QAFormFiller v2.0 installed');
   const result = await chrome.storage.local.get(['configured', 'extensionEnabled', 'siteConfigs']);
   extensionState.configured = result.configured || false;
-  extensionState.enabled = result.extensionEnabled || false;
+  extensionState.enabled = result.extensionEnabled ?? true; // Default enabled
   await chrome.storage.local.set({
     configured: extensionState.configured,
     extensionEnabled: extensionState.enabled,
@@ -65,11 +66,11 @@ chrome.runtime.onInstalled.addListener(async () => {
   updateBadge();
 });
 
-// Icon click opens full tab (EDF style - no popup)
+// Icon click opens full tab at /app (EDF style - no popup)
 chrome.action.onClicked.addListener(async () => {
-  const existingTabs = await chrome.tabs.query({ url: APP_URL + '/*' });
+  const existingTabs = await chrome.tabs.query({ url: 'http://localhost:3000/*' });
   if (existingTabs.length > 0) {
-    await chrome.tabs.update(existingTabs[0].id, { active: true });
+    await chrome.tabs.update(existingTabs[0].id, { active: true, url: APP_URL });
     await chrome.windows.update(existingTabs[0].windowId, { focused: true });
   } else {
     await chrome.tabs.create({ url: APP_URL });

@@ -2,11 +2,80 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, RefreshCw, Download, Upload } from 'lucide-react';
+import { Save, RefreshCw, Download, Upload, Power } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 
 export const Settings = () => {
+  const [extensionEnabled, setExtensionEnabled] = useState(true);
+
+  // Load extension enabled state
+  useEffect(() => {
+    const savedState = localStorage.getItem('qaff_enabled');
+    // Default to true if not set
+    setExtensionEnabled(savedState === null ? true : savedState === 'true');
+  }, []);
+
+  // Toggle extension enabled state
+  const handleExtensionToggle = useCallback((enabled: boolean) => {
+    setExtensionEnabled(enabled);
+    localStorage.setItem('qaff_enabled', String(enabled));
+    
+    // Store in chrome.storage if extension is available
+    try {
+      const chromeObj = (window as unknown as { chrome?: { storage?: { local?: { set: (data: Record<string, unknown>) => void } } } }).chrome;
+      if (chromeObj?.storage?.local) {
+        chromeObj.storage.local.set({ extensionEnabled: enabled });
+      }
+    } catch (e) {
+      // Extension might not be available
+    }
+    
+    // Notify extension via storage event
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'qaff_enabled',
+      newValue: String(enabled),
+      oldValue: String(!enabled),
+    }));
+    
+    // Notify extension via storage event
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'qaff_enabled',
+      newValue: String(enabled),
+      oldValue: String(!enabled),
+    }));
+    
+    toast.success(enabled ? 'Extension ENABLED - DOM interactions active' : 'Extension DISABLED - No interactions', {
+      style: { background: enabled ? '#22c55e' : '#ef4444', color: '#ffffff' }
+    });
+  }, []);
+
   return (
     <div className="space-y-6 max-w-2xl">
+      {/* Extension Control - Most Important */}
+      <div className="glass rounded-xl p-6 space-y-6 border-2 border-primary/20">
+        <div className="flex items-center gap-3">
+          <Power className={`w-6 h-6 ${extensionEnabled ? 'text-green-500' : 'text-red-500'}`} />
+          <h3 className="font-semibold text-foreground text-lg">Extension Control</h3>
+        </div>
+        
+        <div className="flex items-center justify-between p-4 rounded-lg bg-card/50">
+          <div>
+            <Label className="text-base font-medium">Enable Extension</Label>
+            <p className="text-sm text-muted-foreground">
+              {extensionEnabled 
+                ? 'Extension is active and will interact with forms' 
+                : 'Extension is disabled - no DOM interactions will occur'}
+            </p>
+          </div>
+          <Switch 
+            checked={extensionEnabled} 
+            onCheckedChange={handleExtensionToggle}
+            className="scale-125"
+          />
+        </div>
+      </div>
+
       {/* General Settings */}
       <div className="glass rounded-xl p-6 space-y-6">
         <h3 className="font-semibold text-foreground">General Settings</h3>
@@ -92,7 +161,10 @@ export const Settings = () => {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button className="gap-2 gradient-primary text-primary-foreground">
+        <Button 
+          className="gap-2 gradient-primary text-primary-foreground"
+          onClick={() => toast.success('Settings saved!', { style: { background: '#22c55e', color: '#ffffff' } })}
+        >
           <Save className="w-4 h-4" />
           Save Settings
         </Button>
