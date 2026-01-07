@@ -7,72 +7,67 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 
 export const Settings = () => {
-  const [extensionEnabled, setExtensionEnabled] = useState(true);
+  const [extensionEnabled, setExtensionEnabled] = useState(false);
+  const importInputId = 'qaff-settings-import';
 
-  // Load extension enabled state
+  // This UI is for app settings export/import.
+  // Extension ON/OFF is controlled from the extension icon right-click menu.
   useEffect(() => {
     const savedState = localStorage.getItem('qaff_enabled');
-    // Default to true if not set
-    setExtensionEnabled(savedState === null ? true : savedState === 'true');
+    setExtensionEnabled(savedState === 'true');
   }, []);
 
-  // Toggle extension enabled state
-  const handleExtensionToggle = useCallback((enabled: boolean) => {
-    setExtensionEnabled(enabled);
-    localStorage.setItem('qaff_enabled', String(enabled));
-    
-    // Store in chrome.storage if extension is available
-    try {
-      const chromeObj = (window as unknown as { chrome?: { storage?: { local?: { set: (data: Record<string, unknown>) => void } } } }).chrome;
-      if (chromeObj?.storage?.local) {
-        chromeObj.storage.local.set({ extensionEnabled: enabled });
-      }
-    } catch (e) {
-      // Extension might not be available
+  const exportSettings = useCallback(() => {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      appData: localStorage.getItem('edf_app_data') ? JSON.parse(localStorage.getItem('edf_app_data') as string) : null,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `qaformfiller-settings-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast.success('Settings exported');
+  }, []);
+
+  const importSettings = useCallback(async (file: File) => {
+    const text = await file.text();
+    const json = JSON.parse(text);
+
+    if (json?.appData) {
+      localStorage.setItem('edf_app_data', JSON.stringify(json.appData));
+      toast.success('Settings imported. Reloading...');
+      setTimeout(() => window.location.reload(), 400);
+      return;
     }
-    
-    // Notify extension via storage event
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'qaff_enabled',
-      newValue: String(enabled),
-      oldValue: String(!enabled),
-    }));
-    
-    // Notify extension via storage event
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'qaff_enabled',
-      newValue: String(enabled),
-      oldValue: String(!enabled),
-    }));
-    
-    toast.success(enabled ? 'Extension ENABLED - DOM interactions active' : 'Extension DISABLED - No interactions', {
-      style: { background: enabled ? '#22c55e' : '#ef4444', color: '#ffffff' }
-    });
+
+    toast.error('Invalid settings file');
+  }, []);
+
+  const resetDefaults = useCallback(() => {
+    localStorage.removeItem('edf_app_data');
+    toast.success('Reset done. Reloading...');
+    setTimeout(() => window.location.reload(), 400);
   }, []);
 
   return (
     <div className="space-y-6 max-w-2xl">
-      {/* Extension Control - Most Important */}
+      {/* Extension Control */}
       <div className="glass rounded-xl p-6 space-y-6 border-2 border-primary/20">
         <div className="flex items-center gap-3">
-          <Power className={`w-6 h-6 ${extensionEnabled ? 'text-green-500' : 'text-red-500'}`} />
+          <Power className="w-6 h-6 text-muted-foreground" />
           <h3 className="font-semibold text-foreground text-lg">Extension Control</h3>
         </div>
-        
-        <div className="flex items-center justify-between p-4 rounded-lg bg-card/50">
-          <div>
-            <Label className="text-base font-medium">Enable Extension</Label>
-            <p className="text-sm text-muted-foreground">
-              {extensionEnabled 
-                ? 'Extension is active and will interact with forms' 
-                : 'Extension is disabled - no DOM interactions will occur'}
-            </p>
-          </div>
-          <Switch 
-            checked={extensionEnabled} 
-            onCheckedChange={handleExtensionToggle}
-            className="scale-125"
-          />
+
+        <div className="rounded-lg bg-card/50 p-4 text-sm text-muted-foreground">
+          Enable/Disable the extension from the <strong>extension icon right‑click menu</strong> (checkbox).
         </div>
       </div>
 
@@ -144,15 +139,32 @@ export const Settings = () => {
         <h3 className="font-semibold text-foreground">Data Management</h3>
         
         <div className="flex flex-wrap gap-3">
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={exportSettings}>
             <Download className="w-4 h-4" />
             Export Settings
           </Button>
-          <Button variant="outline" className="gap-2">
+
+          <input
+            id={importInputId}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importSettings(f);
+              e.currentTarget.value = '';
+            }}
+          />
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => document.getElementById(importInputId)?.click()}
+          >
             <Upload className="w-4 h-4" />
             Import Settings
           </Button>
-          <Button variant="outline" className="gap-2">
+
+          <Button variant="outline" className="gap-2" onClick={resetDefaults}>
             <RefreshCw className="w-4 h-4" />
             Reset to Defaults
           </Button>
@@ -161,9 +173,9 @@ export const Settings = () => {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button 
+        <Button
           className="gap-2 gradient-primary text-primary-foreground"
-          onClick={() => toast.success('Settings saved!', { style: { background: '#22c55e', color: '#ffffff' } })}
+          onClick={() => toast.success('Settings saved!')}
         >
           <Save className="w-4 h-4" />
           Save Settings

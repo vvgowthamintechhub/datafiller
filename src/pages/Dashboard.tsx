@@ -20,6 +20,7 @@ interface DashboardProps {
   onRunSite: (id: string) => void;
   onEditSite: (id: string) => void;
   onDeleteSite: (id: string) => void;
+  onDuplicateSite: (id: string) => void;
 }
 
 export const Dashboard = ({
@@ -36,6 +37,7 @@ export const Dashboard = ({
   onRunSite,
   onEditSite,
   onDeleteSite,
+  onDuplicateSite,
 }: DashboardProps) => {
   const activeSites = sites.filter(s => s.status === 'active').length;
   const totalFields = fields.length;
@@ -103,6 +105,7 @@ export const Dashboard = ({
                 onRun={() => onRunSite(site.id)}
                 onEdit={() => onEditSite(site.id)}
                 onDelete={() => onDeleteSite(site.id)}
+                onDuplicate={() => onDuplicateSite(site.id)}
               />
             ))}
           </div>

@@ -27,13 +27,14 @@ let extensionState = {
 // ============= INITIALIZATION =============
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('[EDF] QAFormFiller v2.0 installed');
-  
+
   // Check if already configured
   const result = await chrome.storage.local.get(['configured', 'extensionEnabled', 'siteConfigs']);
-  
+
   extensionState.configured = result.configured || false;
-  extensionState.enabled = result.extensionEnabled ?? true; // Default to enabled
-  
+  // EDF v4 default: OFF until user enables
+  extensionState.enabled = result.extensionEnabled ?? false;
+
   // Initialize storage
   await chrome.storage.local.set({
     configured: extensionState.configured,
@@ -42,7 +43,18 @@ chrome.runtime.onInstalled.addListener(async () => {
     errors: [],
     workflows: []
   });
-  
+
+  // Right-click action menu: Enable/Disable (checkbox)
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'qaff_toggle_enabled',
+      title: 'Enable QAFormFiller',
+      type: 'checkbox',
+      checked: extensionState.enabled,
+      contexts: ['action']
+    });
+  });
+
   updateBadge();
 });
 
@@ -73,15 +85,27 @@ function updateBadge() {
   }
 }
 
-// Storage change listener for badge
+// Storage change listener for badge + context menu
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.extensionEnabled) {
     extensionState.enabled = changes.extensionEnabled.newValue;
     updateBadge();
+    try {
+      chrome.contextMenus.update('qaff_toggle_enabled', { checked: extensionState.enabled });
+    } catch (e) {
+      // ignore
+    }
   }
   if (changes.configured) {
     extensionState.configured = changes.configured.newValue;
   }
+});
+
+// Right-click menu click handler (checkbox)
+chrome.contextMenus.onClicked.addListener(async (info) => {
+  if (info.menuItemId !== 'qaff_toggle_enabled') return;
+  const enabled = !!info.checked;
+  await handleMessage({ action: 'setEnabled', enabled }, null);
 });
 
 // ============= WORKFLOW ENGINE =============
@@ -293,7 +317,7 @@ async function handleMessage(message, sender) {
       const config = await chrome.storage.local.get(['siteConfigs', 'extensionEnabled', 'configured']);
       return {
         configs: config.siteConfigs || [],
-        enabled: config.extensionEnabled || false,
+        enabled: config.extensionEnabled ?? false,
         configured: config.configured || false
       };
       
@@ -472,49 +496,52 @@ async function runSiteAutomation(siteId, rowData = {}) {
 
 // ============= HIGHLIGHT FIELD =============
 async function highlightFieldInTab(message) {
-  const { url, field } = message;
-  
-  // Find tab with matching URL
+  const { url, field, matchType = 'contains' } = message;
+
+  if (!extensionState.enabled) {
+    return { success: false, error: 'Extension is disabled. Enable it first, then try highlight.' };
+  }
+
+  // Find an already-opened tab that matches the configured page URL
   const allTabs = await chrome.tabs.query({});
   let targetTab = null;
-  
+
   for (const tab of allTabs) {
-    if (tab.url && tab.url.includes(url)) {
+    if (!tab.url) continue;
+
+    let matches = false;
+    try {
+      if (matchType === 'regex') matches = new RegExp(url).test(tab.url);
+      else if (matchType === 'exact') matches = tab.url === url;
+      else matches = tab.url.includes(url);
+    } catch {
+      matches = tab.url.includes(url);
+    }
+
+    if (matches) {
       targetTab = tab;
       break;
     }
   }
-  
+
   if (!targetTab) {
-    return { success: false, error: `Please open the URL first: ${url}` };
+    return { success: false, error: `Please open the URL first and then try to highlight: ${url}` };
   }
-  
-  // Focus the tab
+
+  // Focus the tab (UI never controls tabs; background does)
   await chrome.tabs.update(targetTab.id, { active: true });
   await chrome.windows.update(targetTab.windowId, { focused: true });
-  
+
   // Send highlight command
   try {
-    const result = await chrome.tabs.sendMessage(targetTab.id, {
+    return await sendToContent(targetTab.id, {
       action: 'highlightElement',
       selector: field.selectorQuery,
       selectorType: field.selectorType,
       fieldName: field.name
     });
-    return result;
   } catch (error) {
-    // Inject content script and retry
-    await chrome.scripting.executeScript({
-      target: { tabId: targetTab.id },
-      files: ['content.js']
-    });
-    await delay(500);
-    return await chrome.tabs.sendMessage(targetTab.id, {
-      action: 'highlightElement',
-      selector: field.selectorQuery,
-      selectorType: field.selectorType,
-      fieldName: field.name
-    });
+    return { success: false, error: error.message };
   }
 }
 

@@ -13,7 +13,7 @@
  */
 
 // ============= STATE =============
-let isEnabled = true; // Default to enabled
+let isEnabled = false; // EDF v4 default: disabled until user enables
 let currentConfig = null;
 let isRecording = false;
 let recordedSteps = [];
@@ -681,73 +681,75 @@ async function runFormFill() {
 async function init() {
   try {
     const result = await chrome.runtime.sendMessage({ action: 'getConfig' });
-    // Default to enabled if not explicitly set
-    isEnabled = result.enabled ?? true;
-    
+    // EDF v4 default: OFF unless explicitly enabled
+    isEnabled = result.enabled ?? false;
+
     if (isEnabled) {
       Logger.extensionState(true);
       await checkForMatchingSite(result.configs);
     } else {
       Logger.extensionState(false);
     }
+
+    // Always run bridge watcher on the web dashboard (even if disabled)
+    startDashboardBridgeWatcher();
   } catch (e) {
-    // Extension context might not be ready, default to enabled
-    isEnabled = true;
-    Logger.extensionState(true);
+    // If extension context isn't available, keep disabled
+    isEnabled = false;
   }
 }
 
-async function checkForMatchingSite(configs) {
-  if (!isEnabled || !configs) return;
-  
-  const currentUrl = window.location.href;
-  
-  for (const site of configs) {
-    if (!site.pages || site.status !== 'active') continue;
-    
-    for (const page of site.pages) {
-      if (!page.active) continue;
-      
-      let matches = false;
-      try {
-        switch (page.matchType) {
-          case 'regex':
-            matches = new RegExp(page.url).test(currentUrl);
-            break;
-          case 'exact':
-            matches = currentUrl === page.url;
-            break;
-          case 'contains':
-          default:
-            matches = currentUrl.includes(page.url);
-        }
-      } catch (e) {
-        matches = currentUrl.includes(page.url);
-      }
-      
-      if (matches) {
-        currentConfig = { site, page };
-        Logger.siteMatched(site.name, currentUrl);
-        highlightConfiguredFields();
-        return;
-      }
-    }
-  }
-}
+// ============= DASHBOARD BRIDGE (Web App -> Background) =============
+let lastHighlightRequestTs = 0;
 
-function highlightConfiguredFields() {
-  if (!isEnabled || !currentConfig?.page?.fields) return;
-  
-  currentConfig.page.fields.forEach(field => {
-    if (!field.enabled) return;
-    
-    const element = findElement(field.selectorQuery, field.selectorType);
-    if (element) {
-      element.style.outline = '2px dashed #3b82f6';
-      element.style.outlineOffset = '2px';
-      element.title = `QAFormFiller: ${field.name}`;
+function startDashboardBridgeWatcher() {
+  // Only run on the web app routes (avoid touching random sites)
+  const isAppRoute = window.location.pathname.startsWith('/app') || window.location.pathname.startsWith('/sites');
+  if (!isAppRoute) return;
+
+  // Poll localStorage for highlight requests created by the web app UI
+  setInterval(async () => {
+    const raw = localStorage.getItem('qaff_highlight_request');
+    if (!raw) return;
+
+    let req;
+    try {
+      req = JSON.parse(raw);
+    } catch {
+      localStorage.removeItem('qaff_highlight_request');
+      return;
     }
-  });
+
+    const ts = Number(req?.timestamp || 0);
+    if (!ts || ts === lastHighlightRequestTs) return;
+    lastHighlightRequestTs = ts;
+
+    // Always clear request so it won't re-run
+    localStorage.removeItem('qaff_highlight_request');
+
+    if (!isEnabled) {
+      localStorage.setItem('qaff_highlight_response', JSON.stringify({
+        timestamp: ts,
+        success: false,
+        error: 'Extension is disabled. Enable it first, then try highlight.'
+      }));
+      return;
+    }
+
+    try {
+      const res = await chrome.runtime.sendMessage(req);
+      localStorage.setItem('qaff_highlight_response', JSON.stringify({
+        timestamp: ts,
+        ...res
+      }));
+    } catch (e) {
+      localStorage.setItem('qaff_highlight_response', JSON.stringify({
+        timestamp: ts,
+        success: false,
+        error: e?.message || 'Failed to highlight'
+      }));
+    }
+  }, 400);
 }
 
 // Initialize on load
