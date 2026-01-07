@@ -134,6 +134,25 @@ export const Settings = () => {
         </div>
       </div>
 
+      {/* Extension Download */}
+      <div className="glass rounded-xl p-6 space-y-6 border-2 border-green-500/30 bg-green-500/5">
+        <h3 className="font-semibold text-foreground">Chrome Extension</h3>
+        <p className="text-sm text-muted-foreground">
+          Download and install the Chrome extension to enable form filling automation.
+        </p>
+        <Button 
+          className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+          onClick={async () => {
+            const { downloadExtension } = await import('@/lib/extensionZip');
+            await downloadExtension();
+            toast.success('Extension downloaded! Extract and load in Chrome.');
+          }}
+        >
+          <Download className="w-4 h-4" />
+          Download Extension (.zip)
+        </Button>
+      </div>
+
       {/* Data Management */}
       <div className="glass rounded-xl p-6 space-y-6">
         <h3 className="font-semibold text-foreground">Data Management</h3>
