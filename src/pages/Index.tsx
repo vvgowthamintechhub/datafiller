@@ -108,6 +108,7 @@ const Index = () => {
             onRunSite={handleRunSite}
             onEditSite={handleEditSite}
             onDeleteSite={handleDeleteSite}
+            onDuplicateSite={handleDuplicateSite}
           />
         );
       case 'sites':

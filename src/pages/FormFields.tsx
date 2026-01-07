@@ -141,32 +141,56 @@ export const FormFields = ({
       });
       return;
     }
-    
-    // Try to communicate with extension via postMessage
-    // The extension will listen for this and highlight the field
-    const highlightData = {
+
+    const ts = Date.now();
+    localStorage.setItem('qaff_highlight_response', '');
+
+    // Request picked up by extension content script running on this /app tab
+    localStorage.setItem('qaff_highlight_request', JSON.stringify({
       action: 'highlightField',
       url: page.url,
+      matchType: page.matchType,
       field: {
         selectorType: field.selectorType,
         selectorQuery: field.selectorQuery,
         name: field.name
-      }
-    };
-    
-    // Store in localStorage for extension to pick up
-    localStorage.setItem('qaff_highlight_request', JSON.stringify({
-      ...highlightData,
-      timestamp: Date.now()
+      },
+      timestamp: ts
     }));
-    
-    // Also dispatch a custom event
-    window.dispatchEvent(new CustomEvent('qaff-highlight-request', { detail: highlightData }));
-    
-    toast.info(`Looking for field "${field.name}" in browser tabs matching: ${page.url}`, {
+
+    toast.info('Switching to the matching tab and highlighting...', {
       style: { background: '#3b82f6', color: '#ffffff' },
-      duration: 3000
+      duration: 2000
     });
+
+    // Wait for response written by the extension bridge
+    const start = Date.now();
+    const timer = setInterval(() => {
+      const raw = localStorage.getItem('qaff_highlight_response');
+      if (!raw) return;
+      let res: any;
+      try {
+        res = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      if (res?.timestamp !== ts) return;
+
+      clearInterval(timer);
+
+      if (res.success) {
+        toast.success('Highlighted successfully', { style: { background: '#22c55e', color: '#ffffff' } });
+      } else {
+        toast.error(res.error || res.message || 'Highlight failed', { style: { background: '#ef4444', color: '#ffffff' } });
+      }
+    }, 250);
+
+    setTimeout(() => {
+      if (Date.now() - start >= 6000) {
+        clearInterval(timer);
+        toast.error('No response from extension. Is it enabled?', { style: { background: '#ef4444', color: '#ffffff' } });
+      }
+    }, 6200);
   };
 
   const handleSelectAll = (checked: boolean) => {

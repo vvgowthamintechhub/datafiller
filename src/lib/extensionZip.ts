@@ -11,7 +11,8 @@ const manifestJson = `{
     "scripting",
     "tabs",
     "webNavigation",
-    "downloads"
+    "downloads",
+    "contextMenus"
   ],
   "host_permissions": ["<all_urls>"],
   "action": {
@@ -48,7 +49,7 @@ const APP_URL = 'http://localhost:3000/app';
 
 let extensionState = {
   configured: false,
-  enabled: true, // Default to enabled
+  enabled: false, // EDF v4 default: OFF until user enables
   errors: []
 };
 
@@ -56,13 +57,24 @@ chrome.runtime.onInstalled.addListener(async () => {
   console.log('[EDF] QAFormFiller v2.0 installed');
   const result = await chrome.storage.local.get(['configured', 'extensionEnabled', 'siteConfigs']);
   extensionState.configured = result.configured || false;
-  extensionState.enabled = result.extensionEnabled ?? true; // Default enabled
+  extensionState.enabled = result.extensionEnabled ?? false;
   await chrome.storage.local.set({
     configured: extensionState.configured,
     extensionEnabled: extensionState.enabled,
     siteConfigs: result.siteConfigs || [],
     errors: []
   });
+
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'qaff_toggle_enabled',
+      title: 'Enable QAFormFiller',
+      type: 'checkbox',
+      checked: extensionState.enabled,
+      contexts: ['action']
+    });
+  });
+
   updateBadge();
 });
 
@@ -86,7 +98,13 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes.extensionEnabled) {
     extensionState.enabled = changes.extensionEnabled.newValue;
     updateBadge();
+    try { chrome.contextMenus.update('qaff_toggle_enabled', { checked: extensionState.enabled }); } catch (e) {}
   }
+});
+
+chrome.contextMenus.onClicked.addListener(async (info) => {
+  if (info.menuItemId !== 'qaff_toggle_enabled') return;
+  await handleMessage({ action: 'setEnabled', enabled: !!info.checked });
 });
 
 function delay(ms) {
@@ -151,24 +169,37 @@ async function handleMessage(message) {
 }
 
 async function highlightFieldInTab(message) {
-  const { url, field } = message;
+  const { url, field, matchType = 'contains' } = message;
+  const enabled = (await chrome.storage.local.get(['extensionEnabled'])).extensionEnabled ?? false;
+  if (!enabled) return { success: false, error: 'Extension is disabled. Enable it first, then try highlight.' };
+
   const allTabs = await chrome.tabs.query({});
   let targetTab = null;
-  
+
   for (const tab of allTabs) {
-    if (tab.url && tab.url.includes(url)) {
+    if (!tab.url) continue;
+    let matches = false;
+    try {
+      if (matchType === 'regex') matches = new RegExp(url).test(tab.url);
+      else if (matchType === 'exact') matches = tab.url === url;
+      else matches = tab.url.includes(url);
+    } catch {
+      matches = tab.url.includes(url);
+    }
+
+    if (matches) {
       targetTab = tab;
       break;
     }
   }
-  
+
   if (!targetTab) {
-    return { success: false, error: 'Please open the URL first: ' + url };
+    return { success: false, error: 'Please open the URL first and then try to highlight: ' + url };
   }
-  
+
   await chrome.tabs.update(targetTab.id, { active: true });
   await chrome.windows.update(targetTab.windowId, { focused: true });
-  
+
   try {
     return await sendToContent(targetTab.id, {
       action: 'highlightElement',
