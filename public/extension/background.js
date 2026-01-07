@@ -24,15 +24,40 @@ let extensionState = {
   lastError: null
 };
 
+// ============= CONTEXT MENU SETUP =============
+async function setupContextMenu() {
+  try {
+    await chrome.contextMenus.removeAll();
+    chrome.contextMenus.create({
+      id: 'qaff_toggle_enabled',
+      title: 'Enable QAFormFiller',
+      type: 'checkbox',
+      checked: extensionState.enabled,
+      contexts: ['action']
+    });
+  } catch (e) {
+    console.log('[EDF] Context menu setup error (expected on reload):', e.message);
+  }
+}
+
 // ============= INITIALIZATION =============
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('[EDF] QAFormFiller v2.0 installed');
+  await initializeExtension();
+});
 
+// Also run on startup (for when browser restarts)
+chrome.runtime.onStartup.addListener(async () => {
+  console.log('[EDF] QAFormFiller starting up');
+  await initializeExtension();
+});
+
+async function initializeExtension() {
   // Check if already configured
   const result = await chrome.storage.local.get(['configured', 'extensionEnabled', 'siteConfigs']);
 
   extensionState.configured = result.configured || false;
-  // EDF v4 default: OFF until user enables
+  // EDF v4 default: OFF until user enables via right-click menu
   extensionState.enabled = result.extensionEnabled ?? false;
 
   // Initialize storage
@@ -44,19 +69,18 @@ chrome.runtime.onInstalled.addListener(async () => {
     workflows: []
   });
 
-  // Right-click action menu: Enable/Disable (checkbox)
-  chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: 'qaff_toggle_enabled',
-      title: 'Enable QAFormFiller',
-      type: 'checkbox',
-      checked: extensionState.enabled,
-      contexts: ['action']
-    });
-  });
-
+  // Setup right-click context menu
+  await setupContextMenu();
   updateBadge();
-});
+}
+
+// Ensure context menu exists when service worker wakes up
+(async () => {
+  const result = await chrome.storage.local.get(['extensionEnabled']);
+  extensionState.enabled = result.extensionEnabled ?? false;
+  await setupContextMenu();
+  updateBadge();
+})();
 
 // ============= ICON CLICK HANDLER =============
 // EDF v4 Style: Click opens full tab, NOT popup
@@ -86,14 +110,15 @@ function updateBadge() {
 }
 
 // Storage change listener for badge + context menu
-chrome.storage.onChanged.addListener((changes) => {
+chrome.storage.onChanged.addListener(async (changes) => {
   if (changes.extensionEnabled) {
     extensionState.enabled = changes.extensionEnabled.newValue;
     updateBadge();
     try {
-      chrome.contextMenus.update('qaff_toggle_enabled', { checked: extensionState.enabled });
+      await chrome.contextMenus.update('qaff_toggle_enabled', { checked: extensionState.enabled });
     } catch (e) {
-      // ignore
+      // Menu might not exist yet, recreate it
+      await setupContextMenu();
     }
   }
   if (changes.configured) {
@@ -496,10 +521,10 @@ async function runSiteAutomation(siteId, rowData = {}) {
 
 // ============= HIGHLIGHT FIELD =============
 async function highlightFieldInTab(message) {
-  const { url, field, matchType = 'contains' } = message;
+  const { url, field, matchType = 'contains', openIfNotFound = false } = message;
 
   if (!extensionState.enabled) {
-    return { success: false, error: 'Extension is disabled. Enable it first, then try highlight.' };
+    return { success: false, error: 'Extension is disabled. Right-click extension icon → Enable QAFormFiller' };
   }
 
   // Find an already-opened tab that matches the configured page URL
@@ -524,13 +549,24 @@ async function highlightFieldInTab(message) {
     }
   }
 
+  // If no tab found, open a new tab with the URL
   if (!targetTab) {
-    return { success: false, error: `Please open the URL first and then try to highlight: ${url}` };
+    // Construct full URL if needed
+    let fullUrl = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      fullUrl = 'https://' + url;
+    }
+    
+    // Open new tab and wait for load
+    const newTab = await chrome.tabs.create({ url: fullUrl, active: true });
+    await waitForTabLoad(newTab.id);
+    await delay(1000); // Extra delay for dynamic content
+    targetTab = newTab;
+  } else {
+    // Focus the existing tab
+    await chrome.tabs.update(targetTab.id, { active: true });
+    await chrome.windows.update(targetTab.windowId, { focused: true });
   }
-
-  // Focus the tab (UI never controls tabs; background does)
-  await chrome.tabs.update(targetTab.id, { active: true });
-  await chrome.windows.update(targetTab.windowId, { focused: true });
 
   // Send highlight command
   try {
@@ -581,5 +617,23 @@ async function stopRecording() {
   
   return { success: true, steps };
 }
+
+// ============= TAB UPDATE LISTENER (Auto-fill on navigation) =============
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  // Only act when page finishes loading
+  if (changeInfo.status !== 'complete') return;
+  if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) return;
+  
+  // Check if extension is enabled
+  const result = await chrome.storage.local.get(['extensionEnabled']);
+  if (!result.extensionEnabled) return;
+  
+  // Notify content script to check for matching site
+  try {
+    await chrome.tabs.sendMessage(tabId, { action: 'checkSiteMatch' });
+  } catch (e) {
+    // Content script not loaded yet, that's okay
+  }
+});
 
 console.log('[EDF] Background service worker initialized');
