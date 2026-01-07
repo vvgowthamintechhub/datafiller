@@ -25,6 +25,12 @@ export interface SitePage {
 // Field types
 export type FieldType =
   | 'text'
+  | 'email'
+  | 'tel'
+  | 'password'
+  | 'number'
+  | 'url'
+  | 'search'
   | 'select'
   | 'multipleSelect'
   | 'checkbox'
