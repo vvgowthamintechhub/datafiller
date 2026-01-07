@@ -13,7 +13,16 @@ import {
 } from '@/types';
 
 const STORAGE_KEY = 'edf_app_data';
+const STORAGE_VERSION = 'v2_demo_qavalidation'; // Force fresh data for demo site
 
+// Clear old cache on version change
+(() => {
+  const storedVersion = localStorage.getItem('edf_storage_version');
+  if (storedVersion !== STORAGE_VERSION) {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.setItem('edf_storage_version', STORAGE_VERSION);
+  }
+})();
 // DEMO SITE ONLY: QA Validation Demo Form
 const initialSites: Site[] = [
   {
