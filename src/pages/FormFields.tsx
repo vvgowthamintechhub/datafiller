@@ -134,7 +134,7 @@ export const FormFields = ({
     });
   };
 
-  const handleHighlightField = (field: FormField) => {
+  const handleHighlightField = async (field: FormField) => {
     if (!field.selectorQuery) {
       toast.error('Please enter a selector query first', {
         style: { background: '#ef4444', color: '#ffffff' }
@@ -142,21 +142,30 @@ export const FormFields = ({
       return;
     }
     
-    // Send message to extension via localStorage
-    const message = {
-      type: 'HIGHLIGHT_FIELD',
+    // Try to communicate with extension via postMessage
+    // The extension will listen for this and highlight the field
+    const highlightData = {
+      action: 'highlightField',
+      url: page.url,
       field: {
         selectorType: field.selectorType,
         selectorQuery: field.selectorQuery,
         name: field.name
-      },
-      url: page.url
+      }
     };
     
-    localStorage.setItem('edf_highlight_request', JSON.stringify(message));
+    // Store in localStorage for extension to pick up
+    localStorage.setItem('qaff_highlight_request', JSON.stringify({
+      ...highlightData,
+      timestamp: Date.now()
+    }));
     
-    toast.success(`Open "${page.url}" in your browser to highlight "${field.name}"`, {
-      style: { background: '#22c55e', color: '#ffffff' }
+    // Also dispatch a custom event
+    window.dispatchEvent(new CustomEvent('qaff-highlight-request', { detail: highlightData }));
+    
+    toast.info(`Looking for field "${field.name}" in browser tabs matching: ${page.url}`, {
+      style: { background: '#3b82f6', color: '#ffffff' },
+      duration: 3000
     });
   };
 

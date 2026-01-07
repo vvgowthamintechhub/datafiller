@@ -1,20 +1,28 @@
 {
   "manifest_version": 3,
   "name": "QAFormFiller",
-  "version": "1.0.0",
-  "description": "Automate form filling with Excel data",
-  "permissions": ["activeTab", "storage", "scripting"],
+  "version": "2.0.0",
+  "description": "EDF-style browser automation - Form filling with Excel data",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "tabs",
+    "webNavigation",
+    "downloads"
+  ],
   "host_permissions": ["<all_urls>"],
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
-    }
+    },
+    "default_title": "QAFormFiller - Click to open dashboard"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [{
     "matches": ["<all_urls>"],
