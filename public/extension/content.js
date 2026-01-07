@@ -33,74 +33,62 @@ const Logger = {
     divider: 'color: #6366f1; font-weight: bold;'
   },
   
+  // Always log header even if disabled (for debugging)
   header(msg) {
-    if (!isEnabled) return;
     console.log(`%c🚀 ${msg}`, this.styles.header);
   },
   
   divider() {
-    if (!isEnabled) return;
     console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', this.styles.divider);
   },
   
   siteMatched(siteName, url) {
-    if (!isEnabled) return;
     this.divider();
     console.log(`%c📋 SITE MATCHED %c${siteName}`, this.styles.info, 'color: #3b82f6; font-weight: bold; font-size: 13px;');
     console.log(`%c🔗 URL: %c${url}`, 'color: #6b7280;', 'color: #3b82f6; text-decoration: underline;');
   },
   
   fieldExecute(name, index, total) {
-    if (!isEnabled) return;
     console.log('');
     console.log(`%c▶ FIELD [${index}/${total}] %c${name}`, this.styles.field, 'color: #8b5cf6; font-weight: bold;');
   },
   
   selector(type, query) {
-    if (!isEnabled) return;
     console.log(`  %cSelector: %c${type.toUpperCase()} %c→ %c${query}`, 
       'color: #6b7280;', this.styles.selector, 'color: #6b7280;', this.styles.value);
   },
   
   elementFound(tagName, details = '') {
-    if (!isEnabled) return;
     console.log(`  %c✓ FOUND %c<${tagName}> ${details}`, this.styles.success, 'color: #10b981;');
   },
   
   elementNotFound() {
-    if (!isEnabled) return;
     console.log(`  %c✗ NOT FOUND %cElement does not exist in DOM`, this.styles.error, 'color: #ef4444;');
   },
   
   fillAction(type, value) {
-    if (!isEnabled) return;
-    const displayValue = value.length > 50 ? value.substring(0, 50) + '...' : value;
+    const displayValue = value && value.length > 50 ? value.substring(0, 50) + '...' : (value || '');
     console.log(`  %c⚡ ${type.toUpperCase()} %c→ %c"${displayValue}"`, 
       this.styles.action, 'color: #6b7280;', 'color: #10b981;');
   },
   
   success(msg) {
-    if (!isEnabled) return;
     console.log(`  %c✓ SUCCESS %c${msg}`, this.styles.success, 'color: #10b981;');
   },
   
   error(msg) {
-    if (!isEnabled) return;
     console.log(`  %c✗ ERROR %c${msg}`, this.styles.error, 'color: #ef4444;');
   },
   
   warning(msg) {
-    if (!isEnabled) return;
     console.log(`  %c⚠ WARNING %c${msg}`, this.styles.warning, 'color: #f59e0b;');
   },
   
   waiting(msg) {
-    if (!isEnabled) return;
     console.log(`  %c⏳ WAITING %c${msg}`, 'background: #6366f1; color: white; padding: 3px 8px; border-radius: 4px;', 'color: #6366f1;');
   },
   
   report(results) {
-    if (!isEnabled) return;
     this.divider();
     console.log('%c📊 EXECUTION REPORT', this.styles.header);
     console.table(results);
@@ -348,11 +336,8 @@ function highlightElement(selector, selectorType, fieldName) {
     el.style.outline = '';
     el.style.outlineOffset = '';
     el.classList.remove('qaff-highlight');
-    
-    // Remove label
-    const label = el.querySelector('.qaff-label');
-    if (label) label.remove();
   });
+  document.querySelectorAll('.qaff-label').forEach(el => el.remove());
   
   const element = findElement(selector, selectorType);
   
@@ -367,22 +352,23 @@ function highlightElement(selector, selectorType, fieldName) {
     const label = document.createElement('div');
     label.className = 'qaff-label';
     label.style.cssText = `
-      position: absolute;
+      position: fixed;
       background: #22c55e;
       color: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
       font-weight: bold;
       z-index: 999999;
       pointer-events: none;
       font-family: system-ui, sans-serif;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     `;
     label.textContent = `✓ ${fieldName || 'Field Found'}`;
     
     const rect = element.getBoundingClientRect();
-    label.style.top = `${window.scrollY + rect.top - 30}px`;
-    label.style.left = `${window.scrollX + rect.left}px`;
+    label.style.top = `${Math.max(10, rect.top - 40)}px`;
+    label.style.left = `${Math.max(10, rect.left)}px`;
     document.body.appendChild(label);
     
     // Remove after 5 seconds
@@ -493,10 +479,21 @@ async function handleMessage(message) {
       Logger.extensionState(isEnabled);
       if (!isEnabled) {
         // Remove all highlights
-        document.querySelectorAll('.qaff-highlight, .qaff-label').forEach(el => el.remove?.() || (el.style.outline = ''));
+        document.querySelectorAll('.qaff-highlight').forEach(el => {
+          el.style.outline = '';
+          el.style.outlineOffset = '';
+          el.classList.remove('qaff-highlight');
+        });
+        document.querySelectorAll('.qaff-label').forEach(el => el.remove());
         currentConfig = null;
       } else {
-        await init();
+        await checkAndRunAutomation();
+      }
+      return { success: true };
+      
+    case 'checkSiteMatch':
+      if (isEnabled) {
+        await checkAndRunAutomation();
       }
       return { success: true };
       
@@ -570,18 +567,80 @@ async function handleMessage(message) {
   }
 }
 
+// ============= CHECK AND RUN AUTOMATION =============
+async function checkAndRunAutomation() {
+  try {
+    const result = await chrome.runtime.sendMessage({ action: 'getConfig' });
+    if (!result.configs || result.configs.length === 0) return;
+    
+    await checkForMatchingSite(result.configs);
+  } catch (e) {
+    // Extension context might be invalid
+  }
+}
+
+// ============= SITE MATCHING =============
+async function checkForMatchingSite(configs) {
+  const currentUrl = window.location.href;
+  
+  for (const config of configs) {
+    if (!config.pages) continue;
+    
+    for (const page of config.pages) {
+      if (!page.active) continue;
+      
+      let matches = false;
+      const pageUrl = page.url || '';
+      
+      try {
+        switch (page.matchType) {
+          case 'exact':
+            matches = currentUrl === pageUrl;
+            break;
+          case 'regex':
+            matches = new RegExp(pageUrl).test(currentUrl);
+            break;
+          case 'contains':
+          default:
+            matches = currentUrl.includes(pageUrl);
+            break;
+        }
+      } catch (e) {
+        matches = currentUrl.includes(pageUrl);
+      }
+      
+      if (matches) {
+        currentConfig = {
+          site: config,
+          page: page
+        };
+        
+        Logger.siteMatched(config.name, currentUrl);
+        Logger.header(`Found ${page.fields?.length || 0} fields to fill`);
+        
+        // Auto-run form fill
+        await runFormFill();
+        return;
+      }
+    }
+  }
+}
+
 // ============= FORM FILL EXECUTION =============
 async function runFormFill() {
   if (!isEnabled) {
+    Logger.warning('Extension is disabled');
     return { success: false, message: 'Extension is disabled' };
   }
   
   if (!currentConfig) {
+    Logger.warning('No matching site configuration');
     return { success: false, message: 'No matching site configuration' };
   }
   
   const fields = currentConfig.page?.fields || [];
   if (fields.length === 0) {
+    Logger.warning('No fields configured');
     return { success: false, message: 'No fields configured' };
   }
   
@@ -684,11 +743,10 @@ async function init() {
     // EDF v4 default: OFF unless explicitly enabled
     isEnabled = result.enabled ?? false;
 
+    Logger.extensionState(isEnabled);
+    
     if (isEnabled) {
-      Logger.extensionState(true);
-      await checkForMatchingSite(result.configs);
-    } else {
-      Logger.extensionState(false);
+      await checkForMatchingSite(result.configs || []);
     }
 
     // Always run bridge watcher on the web dashboard (even if disabled)
@@ -704,7 +762,9 @@ let lastHighlightRequestTs = 0;
 
 function startDashboardBridgeWatcher() {
   // Only run on the web app routes (avoid touching random sites)
-  const isAppRoute = window.location.pathname.startsWith('/app') || window.location.pathname.startsWith('/sites');
+  const isAppRoute = window.location.pathname.startsWith('/app') || 
+                     window.location.pathname.startsWith('/sites') ||
+                     window.location.hostname === 'localhost';
   if (!isAppRoute) return;
 
   // Poll localStorage for highlight requests created by the web app UI
@@ -726,15 +786,6 @@ function startDashboardBridgeWatcher() {
 
     // Always clear request so it won't re-run
     localStorage.removeItem('qaff_highlight_request');
-
-    if (!isEnabled) {
-      localStorage.setItem('qaff_highlight_response', JSON.stringify({
-        timestamp: ts,
-        success: false,
-        error: 'Extension is disabled. Enable it first, then try highlight.'
-      }));
-      return;
-    }
 
     try {
       const res = await chrome.runtime.sendMessage(req);
